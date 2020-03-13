@@ -1,14 +1,16 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.persistence.{PersistentActor, Recovery, RecoveryCompleted, SnapshotOffer, SnapshotSelectionCriteria}
+import akka.persistence._
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import server.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
-import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, GetArrivals, UniqueArrival}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion
 import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, UniqueArrival}
 
 import scala.collection.mutable
+
+case class GetArrivals(firstDay: SDate, lastDay: SDate)
 
 class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)
@@ -21,7 +23,6 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends Persi
       arrivals ++= flightMessages
         .map(MessageConversion.fromFlightMessage)
         .map(a => (a.uniqueArrival, a))
-      println(s"*********************** Snapshot provided ${arrivals.size} arrivals")
 
     case FlightsDiffMessage(_, removals, updates, oldRemovals) =>
       arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L)))

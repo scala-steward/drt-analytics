@@ -5,7 +5,7 @@ RUN adduser -D -u 1000 drt-admin
 
 RUN ["chown", "-R", "1000:1000", "."]
 
-RUN apk --update add bash
+RUN apk --update add bash curl
 RUN rm -rf /var/cache/apk/*
 
 RUN mkdir -p /home/drt-admin/.postgresql

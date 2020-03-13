@@ -8,6 +8,7 @@ case class Arrival(carrierCode: String,
                    number: Int,
                    scheduled: Long,
                    terminal: String,
+                   status: String,
                    maybeEstimated: Option[Long],
                    maybeTouchdown: Option[Long],
                    maybeEstimatedChox: Option[Long],
@@ -26,5 +27,12 @@ case class Arrival(carrierCode: String,
   def pcpStart: Long = {
     val tenMinutesToPcp = 60 * 1000 * 10
     bestTime + tenMinutesToPcp
+  }
+
+  def isCancelled: Boolean = status match {
+    case st if st.toLowerCase.contains("cancelled") => true
+    case st if st.toLowerCase.contains("canceled") => true
+    case st if st.toLowerCase.contains("deleted") => true
+    case _ => false
   }
 }
