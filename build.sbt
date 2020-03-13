@@ -36,3 +36,4 @@ lazy val root = (project in file("."))
     PB.deleteTargetDirectory := false
   )
   .enablePlugins(DockerPlugin)
+  .enablePlugins(AshScriptPlugin)
