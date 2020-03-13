@@ -1,0 +1,34 @@
+pipeline:
+  sonar-scanner:
+    image: quay.io/ukhomeofficedigital/sonar-scanner:v3.0.1
+    when:
+      event: push
+      branch: ${DRONE_BRANCH}
+
+  build:
+    image: quay.io/ukhomeofficedigital/scala-sbt:latest
+    commands:
+    - /root/entrypoint.sh
+    - sbt docker:stage
+    environment:
+    - ARTIFACTORY_USERNAME=drt_drone
+    secrets:
+    - ARTIFACTORY_PASSWORD
+    when:
+      event:
+      - push
+      branch:
+      - ${DRONE_BRANCH}
+
+  build_push_to_ecr:
+    image: quay.io/ukhomeofficedigital/ecr:latest
+    secrets:
+    - AWS_ACCESS_KEY_ID
+    - AWS_SECRET_ACCESS_KEY
+    repo: 340268328991.dkr.ecr.eu-west-2.amazonaws.com/drt/drt-analytics
+    build_args:
+    - APP_BUILD=${DRONE_COMMIT_SHA}
+    tags:
+    - latest
+    - ${DRONE_COMMIT_SHA}
+    - ${DRONE_BUILD_NUMBER}
