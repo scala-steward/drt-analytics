@@ -1,19 +1,28 @@
 package uk.gov.homeoffice.drt.analytics
 
+import akka.NotUsed
 import akka.actor.{ActorSystem, PoisonPill, Props}
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.common.{CsvEntityStreamingSupport, EntityStreamingSupport}
+import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
+import akka.http.scaladsl.model.ContentTypes
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.directives.MethodDirectives.get
+import akka.http.scaladsl.server.directives.RouteDirectives.complete
 import akka.pattern.AskableActorRef
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.Timeout
+import akka.stream.scaladsl.Source
+import akka.util.{ByteString, Timeout}
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.{ArrivalsActor, FeedPersistenceIds}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.language.postfixOps
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 object AnalyticsApp extends App {
   val log: Logger = LoggerFactory.getLogger(getClass)
@@ -21,28 +30,67 @@ object AnalyticsApp extends App {
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
   implicit val mat: ActorMaterializer = ActorMaterializer()
 
-  val terminal = "T5"
+  val serverBinding: Future[Http.ServerBinding] = Http().bindAndHandle(Routes.routes, "localhost", 8081)
 
-  val sourcesInOrder = List(FeedPersistenceIds.forecastBase, FeedPersistenceIds.forecast, FeedPersistenceIds.live)
+  serverBinding.onComplete {
+    case Success(bound) =>
+      log.info(s"Server online at http://${bound.localAddress.getHostString}:${bound.localAddress.getPort}/")
+    case Failure(e) =>
+      log.error(s"Server could not start!", e)
+      system.terminate()
+  }
+  Await.result(system.whenTerminated, Duration.Inf)
+}
 
-  val startDate = SDate("2020-02-15", DateTimeZone.forID("Europe/London"))
-  val numberOfDays = 25
+object Routes {
+  val log: Logger = LoggerFactory.getLogger(getClass)
+  implicit val system: ActorSystem = ActorSystem("DrtAnalytics")
+  implicit val ec: ExecutionContextExecutor = ExecutionContext.global
+  implicit val mat: ActorMaterializer = ActorMaterializer()
 
-  val eventualSummaries = Source(0 to numberOfDays).mapAsync(1) { dayOffset =>
-    val viewDate = startDate.addDays(dayOffset)
-    val lastDate = startDate.addDays(numberOfDays)
-    val eventualsBySource = DailySummaries.arrivalsForSources(sourcesInOrder, viewDate, lastDate)
-    val eventualMergedArrivals = DailySummaries.mergeArrivals(eventualsBySource)
+  implicit val stringAsCsv = Marshaller.strict[String, ByteString] { t =>
+    Marshalling.WithFixedContentType(ContentTypes.`text/csv(UTF-8)`, () => {
+      ByteString(t)
+    })
+  }
+  implicit val csvStreamingSupport: CsvEntityStreamingSupport = EntityStreamingSupport.csv()
 
-    DailySummaries.summary(viewDate, startDate, numberOfDays, terminal, eventualMergedArrivals)
-  }.runWith(Sink.seq)
+  lazy val routes: Route = pathPrefix("daily-pax" / Segments(2)) {
+    case List(terminal, numberOfDays) =>
+      Try(numberOfDays.toInt) match {
+        case Failure(t) =>
+          complete("Number of days must be an integer")
+        case Success(numDays) =>
+          val now = SDate.now(DateTimeZone.forID("Europe/London"))
+          val today = SDate(now.fullYear, now.month, now.date, 0, 0)
+          val startDate = today.addDays(-1 * (numDays - 1))
+          get {
+            complete(dailyPassengersCsv(terminal.toUpperCase, startDate, numDays - 1))
+          }
+      }
+    case _ =>
+      complete("Hmm")
+  }
 
-  eventualSummaries.onComplete {
-    case Failure(t) =>
-      log.error("Failed to get summaries", t)
-    case Success(summaries) =>
-      println("Date,Terminal," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly}.mkString(",") )
-      println(summaries.mkString("\n"))
+  private def dailyPassengersCsv(terminal: String, startDate: SDate, numberOfDays: Int): Source[String, NotUsed] = {
+    val sourcesInOrder = List(FeedPersistenceIds.forecastBase, FeedPersistenceIds.forecast, FeedPersistenceIds.live)
+
+    val header = "Date,Terminal," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
+
+    val eventualSummaries: Source[String, NotUsed] = Source(0 to numberOfDays)
+      .mapAsync(1) { dayOffset =>
+        val viewDate = startDate.addDays(dayOffset)
+        val lastDate = startDate.addDays(numberOfDays)
+        val eventualsBySource = DailySummaries.arrivalsForSources(sourcesInOrder, viewDate, lastDate)
+        val eventualMergedArrivals = DailySummaries.mergeArrivals(eventualsBySource)
+
+        DailySummaries.summary(viewDate, startDate, numberOfDays, terminal, eventualMergedArrivals).map { row =>
+          if (dayOffset == 0) List(header, row) else List(row)
+        }
+      }
+      .mapConcat(identity)
+
+    eventualSummaries
   }
 }
 
@@ -50,7 +98,8 @@ object DailySummaries {
   val log: Logger = LoggerFactory.getLogger(getClass)
 
   def arrivalsForSources(sources: List[String], date: SDate, lastDate: SDate)
-                        (implicit ec: ExecutionContext, system: ActorSystem): Seq[Future[(String, Arrivals)]] = sources.map { source =>
+                        (implicit ec: ExecutionContext,
+                         system: ActorSystem): Seq[Future[(String, Arrivals)]] = sources.map { source =>
     val pointInTimeForDate = if (source == FeedPersistenceIds.live) date.addHours(26) else date.addHours(-12)
     val askableActor: AskableActorRef = system.actorOf(Props(classOf[ArrivalsActor], source, pointInTimeForDate))
     val result = askableActor
@@ -82,7 +131,11 @@ object DailySummaries {
     }
 
 
-  def summary(date: SDate, startDate: SDate, numberOfDays: Int, terminal: String, eventualArrivals: Future[Map[UniqueArrival, Arrival]])
+  def summary(date: SDate,
+              startDate: SDate,
+              numberOfDays: Int,
+              terminal: String,
+              eventualArrivals: Future[Map[UniqueArrival, Arrival]])
              (implicit ec: ExecutionContext): Future[String] = {
     eventualArrivals.map {
       case arrivals =>

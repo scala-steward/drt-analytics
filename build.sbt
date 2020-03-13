@@ -4,26 +4,27 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
+lazy val akkaHttpVersion = "10.1.9"
 lazy val akkaVersion = "2.5.23"
-
-lazy val akkaPersistenceJdbc = "3.5.0"
-
-lazy val postgres = "42.2.2"
-
-lazy val jodaTime = "2.9.4"
+lazy val akkaPersistenceJdbcVersion = "3.5.0"
+lazy val postgresVersion = "42.2.2"
+lazy val jodaTimeVersion = "2.9.4"
+lazy val logbackClassicVersion = "1.2.3"
+lazy val scalaTestVersion = "3.1.0"
 
 libraryDependencies ++= Seq(
-  "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
 
+  "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
   "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
-  "com.github.dnvriend" %% "akka-persistence-jdbc" % akkaPersistenceJdbc,
-  "org.postgresql" % "postgresql" % postgres,
+  "com.github.dnvriend" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
+  "org.postgresql" % "postgresql" % postgresVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-  "joda-time" % "joda-time" % jodaTime,
-  "org.scalatest" %% "scalatest" % "3.1.0" % Test
+  "joda-time" % "joda-time" % jodaTimeVersion,
+  "org.scalatest" %% "scalatest" % scalaTestVersion % Test
   )
 
 lazy val root = (project in file("."))
@@ -34,6 +35,6 @@ lazy val root = (project in file("."))
       scalapb.gen() -> (sourceManaged in Compile).value / "protobuf"
       ),
     PB.deleteTargetDirectory := false
-  )
+    )
   .enablePlugins(DockerPlugin)
   .enablePlugins(AshScriptPlugin)
