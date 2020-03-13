@@ -5,12 +5,16 @@ RUN adduser -D -u 1000 drt-admin
 
 RUN ["chown", "-R", "1000:1000", "."]
 
-RUN apk --update add bash curl
+RUN apk --update add bash curl ca-certificates
+
 RUN rm -rf /var/cache/apk/*
 
-RUN mkdir -p /home/drt-admin/.postgresql
-RUN curl https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem > /home/drt-admin/.postgresql/root.crt
+COPY certs/rds-combined-ca-bundle.der /etc/drt/rds-combined-ca-bundle.der
+COPY certs/rds-ca-2019-root.der /etc/drt/rds-ca-2019-root.der
 
+RUN echo keytool $KEYTOOL_PASSWORD
+RUN keytool -noprompt -storepass changeit -import -alias rds-root-deprecated -keystore $JAVA_HOME/lib/security/cacerts -file /etc/drt/rds-combined-ca-bundle.der
+RUN keytool -noprompt -storepass changeit -import -alias rds-root -keystore $JAVA_HOME/lib/security/cacerts -file /etc/drt/rds-ca-2019-root.der
 
 USER 1000
 
