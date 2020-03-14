@@ -9,11 +9,14 @@ lazy val akkaVersion = "2.5.23"
 lazy val akkaPersistenceJdbcVersion = "3.5.0"
 lazy val postgresVersion = "42.2.2"
 lazy val jodaTimeVersion = "2.9.4"
-lazy val logbackClassicVersion = "1.2.3"
+lazy val logbackContribVersion = "0.1.5"
+lazy val jacksonDatabindVersion = "2.10.0"
 lazy val scalaTestVersion = "3.1.0"
 
 libraryDependencies ++= Seq(
-  "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
+  "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
+  "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
+  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
 
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
