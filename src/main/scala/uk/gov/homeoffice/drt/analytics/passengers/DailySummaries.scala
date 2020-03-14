@@ -21,7 +21,7 @@ object DailySummaries {
     val pointInTimeForDate = if (source == FeedPersistenceIds.live) date.addHours(26) else date.addHours(-12)
     val askableActor: AskableActorRef = system.actorOf(Props(classOf[ArrivalsActor], source, pointInTimeForDate))
     val result = askableActor
-      .ask(GetArrivals(date, lastDate))(new Timeout(5 seconds))
+      .ask(GetArrivals(date, lastDate))(new Timeout(30 seconds))
       .asInstanceOf[Future[Arrivals]]
       .map { ar => (source, ar) }
     result.onComplete(_ => askableActor.ask(PoisonPill)(new Timeout(1 second)))
