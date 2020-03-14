@@ -18,7 +18,7 @@ import uk.gov.homeoffice.drt.analytics.actors.FeedPersistenceIds
 import uk.gov.homeoffice.drt.analytics.passengers.DailySummaries
 import uk.gov.homeoffice.drt.analytics.time.SDate
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 object Routes {
@@ -63,9 +63,14 @@ object Routes {
         val eventualsBySource = DailySummaries.arrivalsForSources(sourcesInOrder, viewDate, lastDate)
         val eventualMergedArrivals = DailySummaries.mergeArrivals(eventualsBySource)
 
-        DailySummaries.summary(viewDate, startDate, numberOfDays, terminal, eventualMergedArrivals).map { row =>
-          if (dayOffset == 0) List(header, row) else List(row)
-        }
+        DailySummaries.summary(viewDate, startDate, numberOfDays, terminal, eventualMergedArrivals)
+          .map { row =>
+            if (dayOffset == 0) List(header, row) else List(row)
+          }
+          .recoverWith { case t =>
+            log.error(s"Failed to get summaries", t)
+            Future(List())
+          }
       }
       .mapConcat(identity)
 
