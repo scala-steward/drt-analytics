@@ -14,6 +14,7 @@ lazy val jacksonDatabindVersion = "2.10.0"
 lazy val scalaTestVersion = "3.1.0"
 
 libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
   "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
