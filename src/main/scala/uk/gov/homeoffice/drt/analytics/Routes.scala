@@ -54,7 +54,7 @@ object Routes {
   private def dailyPassengersCsv(terminal: String, startDate: SDate, numberOfDays: Int): Source[String, NotUsed] = {
     val sourcesInOrder = List(FeedPersistenceIds.forecastBase, FeedPersistenceIds.forecast, FeedPersistenceIds.live)
 
-    val header = "Date,Terminal," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
+    val header = "Date,Terminal,Origin," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
 
     val eventualSummaries: Source[String, NotUsed] = Source(0 to numberOfDays)
       .mapAsync(1) { dayOffset =>
