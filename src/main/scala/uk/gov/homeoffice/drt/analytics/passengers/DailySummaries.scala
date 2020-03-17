@@ -72,8 +72,6 @@ object DailySummaries {
                 _.map(_.actPax).sum
               }
 
-            log.info(s"Got ${paxByDayAndOrigin.size} merged arrivals after filtering")
-
             val paxByDay = (0 to numberOfDays).map { dayOffset =>
               paxByDayAndOrigin.get(startDate.addDays(dayOffset).toISODateOnly) match {
                 case None => "-"
@@ -85,4 +83,3 @@ object DailySummaries {
     }
   }
 }
-
