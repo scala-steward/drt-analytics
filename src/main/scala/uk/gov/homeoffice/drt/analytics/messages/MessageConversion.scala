@@ -22,6 +22,7 @@ object MessageConversion {
       voyageNumber,
       fm.scheduled.getOrElse(0L),
       fm.terminal.getOrElse(""),
+      fm.origin.getOrElse(""),
       fm.status.getOrElse(""),
       fm.estimated,
       fm.touchdown,

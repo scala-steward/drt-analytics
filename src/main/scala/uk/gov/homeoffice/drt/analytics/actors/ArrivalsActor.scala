@@ -24,7 +24,7 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends Persi
         .map(MessageConversion.fromFlightMessage)
         .map(a => (a.uniqueArrival, a))
 
-    case FlightsDiffMessage(_, removals, updates, oldRemovals) =>
+    case FlightsDiffMessage(_, removals, updates, _) =>
       arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L)))
       arrivals ++= updates.map(MessageConversion.fromFlightMessage).map(a => (a.uniqueArrival, a))
 

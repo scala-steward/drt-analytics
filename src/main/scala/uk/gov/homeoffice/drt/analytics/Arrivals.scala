@@ -8,6 +8,7 @@ case class Arrival(carrierCode: String,
                    number: Int,
                    scheduled: Long,
                    terminal: String,
+                   origin: String,
                    status: String,
                    maybeEstimated: Option[Long],
                    maybeTouchdown: Option[Long],
@@ -16,7 +17,6 @@ case class Arrival(carrierCode: String,
                    actPax: Int,
                    transPax: Int
                   ) {
-
   def uniqueArrival: UniqueArrival = UniqueArrival(number, terminal, scheduled)
 
   def bestTime: Long = maybeActualChox.getOrElse(

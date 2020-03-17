@@ -57,30 +57,31 @@ object DailySummaries {
     eventualArrivals.map {
       case arrivals =>
         log.info(s"Got all merged arrivals: ${arrivals.size}")
-        val paxByDayAndTerminal = arrivals.values
+        val arrivalsForTerminal = arrivals.values
           .filter(_.terminal == terminal)
           .filterNot(_.isCancelled)
-          .groupBy { a =>
-            val sch = SDate(a.scheduled, DateTimeZone.forID("Europe/London"))
-            (sch.toISODateOnly, a.terminal)
-          }
-          .mapValues {
-            _.map(a => a.actPax - a.transPax).sum
-          }
-          .toSeq
-          .sortBy { case ((day, terminal), _) => s"$day-$terminal" }
-        log.info(s"Got ${paxByDayAndTerminal.size} merged arrivals after filtering")
 
-        val daySummaries = paxByDayAndTerminal.map {
-          case ((date, _), pax) => (date, pax)
-        }.toMap
-        val paxByDay = (0 to numberOfDays).map { dayOffset =>
-          daySummaries.get(startDate.addDays(dayOffset).toISODateOnly) match {
-            case None => "-"
-            case Some(pax) => s"$pax"
-          }
-        }
-        s"${date.toISODateOnly},$terminal,${paxByDay.mkString(",")}"
+        arrivalsForTerminal.groupBy(_.origin).toSeq.sortBy(_._1).map {
+          case (origin, arrivalsByOrigin) =>
+
+            val paxByDayAndOrigin = arrivalsByOrigin
+              .groupBy { a =>
+                SDate(a.scheduled, DateTimeZone.forID("Europe/London")).toISODateOnly
+              }
+              .mapValues {
+                _.map(_.actPax).sum
+              }
+
+            log.info(s"Got ${paxByDayAndOrigin.size} merged arrivals after filtering")
+
+            val paxByDay = (0 to numberOfDays).map { dayOffset =>
+              paxByDayAndOrigin.get(startDate.addDays(dayOffset).toISODateOnly) match {
+                case None => "-"
+                case Some(pax) => s"$pax"
+              }
+            }
+            s"${date.toISODateOnly},$terminal,$origin,${paxByDay.mkString(",")}"
+        }.mkString("\n")
     }
   }
 }
