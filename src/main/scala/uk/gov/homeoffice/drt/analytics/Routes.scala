@@ -47,8 +47,7 @@ object Routes {
             complete(dailyPassengersCsv(terminal.toUpperCase, startDate, numDays - 1))
           }
       }
-    case _ =>
-      complete("Hmm")
+    case _ => complete("Hmm")
   }
 
   private def dailyPassengersCsv(terminal: String, startDate: SDate, numberOfDays: Int): Source[String, NotUsed] = {

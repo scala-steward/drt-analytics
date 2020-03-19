@@ -1,10 +1,16 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
+import akka.actor.ActorRef
 import akka.persistence._
 import org.slf4j.{Logger, LoggerFactory}
 import server.protobuf.messages.PaxMessage.{PaxCountMessage, PaxCountsMessage}
 import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.analytics.{DailyPaxCountsOnDay, PaxDeltas}
 
+
+case class GetAverageDelta(numberOfDays: Int)
+
+case object Ack
 
 class OriginTerminalPassengersActor(origin: String, terminal: String) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)
@@ -31,63 +37,38 @@ class OriginTerminalPassengersActor(origin: String, terminal: String) extends Pe
 
   override def receiveCommand: Receive = {
     case paxNosForDay: DailyPaxCountsOnDay =>
-      val (newState, diff) = paxNosForDay.applyAndGetDiff(paxNosState)
-      paxNosState = newState
-      persist(diff) { updates => PaxCountsMessage(updatesToMessages(updates)) }
+      log.info(s"Received DailyPaxCountsOnDay with ${paxNosForDay.dailyPax.size} updates")
+      persistDiffAndUpdateState(paxNosForDay, sender())
 
     case GetAverageDelta(numberOfDays: Int) =>
-
+      log.info(s"Received request for $numberOfDays days average delta")
+      sendAverageDelta(numberOfDays, sender())
 
     case u =>
       log.info(s"Got unexpected command: $u")
+  }
+
+  private def sendAverageDelta(numberOfDays: Int, replyTo: ActorRef): Unit = {
+    val maybeDeltas = PaxDeltas.maybeDeltas(paxNosState, numberOfDays, () => SDate.now())
+    val maybeAverageDelta = PaxDeltas.maybeAverageDelta(maybeDeltas)
+    replyTo ! maybeAverageDelta
+  }
+
+  private def persistDiffAndUpdateState(paxNosForDay: DailyPaxCountsOnDay, replyTo: ActorRef): Unit = {
+    val (newState, diff) = paxNosForDay.applyAndGetDiff(paxNosState)
+
+    persist(diff) { updates =>
+      PaxCountsMessage(updatesToMessages(updates))
+      paxNosState = newState
+      replyTo ! Ack
+    }
   }
 
   private def updatesToMessages(updates: Iterable[(Long, Long, Int)]): Seq[PaxCountMessage] = updates.map {
     case (pointInTime, day, paxCount) => PaxCountMessage(Option(pointInTime), Option(day), Option(paxCount))
   }.toSeq
 
-  private def messagesToUpdates(updates: Seq[PaxCountMessage]): Seq[(Long, Long, Int)] = updates.map {
+  private def messagesToUpdates(updates: Seq[PaxCountMessage]): Seq[(Long, Long, Int)] = updates.collect {
     case PaxCountMessage(Some(pit), Some(day), Some(paxCount)) => (pit, day, paxCount)
   }
 }
-
-case class DailyPaxCountsOnDay(dayMillis: Long, dailyPax: Map[Long, Int]) {
-  val log: Logger = LoggerFactory.getLogger(getClass)
-
-  import DailyPaxCountsOnDay._
-
-  val day: SDate = SDate(dayMillis)
-
-  def diffFromExisting(existingPaxNos: Map[(Long, Long), Int]): Iterable[(Long, Long, Int)] = dailyPax.map {
-    case (incomingDayMillis, incomingPax) =>
-      val key = (day.millisSinceEpoch, incomingDayMillis)
-      val incomingDay = SDate(incomingDayMillis)
-
-      existingPaxNos.get(key) match {
-        case None =>
-          log.info(s"New day of pax ($incomingPax) for ${incomingDay.toISOString} on ${day.toISOString}")
-          Some((day.millisSinceEpoch, incomingDayMillis, incomingPax))
-        case Some(existingPax) if existingPax != incomingPax =>
-          log.debug(s"Change in pax ($existingPax -> $incomingPax) for ${incomingDay.toISOString} on ${day.toISOString}")
-          Some((day.millisSinceEpoch, incomingDayMillis, incomingPax))
-        case Some(existingPax) =>
-          log.debug(s"No change in pax ($existingPax) for ${incomingDay.toISOString} on ${day.toISOString}")
-          None
-      }
-  }.collect { case Some(diff) => diff }
-
-  def applyToExisting(existingCounts: Map[(Long, Long), Int]): Map[(Long, Long), Int] =
-    applyDiffToExisting(diffFromExisting(existingCounts), existingCounts)
-
-  def applyAndGetDiff(existingCounts: Map[(Long, Long), Int]): (Map[(Long, Long), Int], Iterable[(Long, Long, Int)]) =
-    (applyDiffToExisting(diffFromExisting(existingCounts), existingCounts), diffFromExisting(existingCounts))
-}
-
-object DailyPaxCountsOnDay {
-  def applyDiffToExisting(diff: Iterable[(Long, Long, Int)],
-                          existing: Map[(Long, Long), Int]): Map[(Long, Long), Int] = diff.foldLeft(existing) {
-    case (stateSoFar, (pit, day, paxCount)) => stateSoFar.updated((pit, day), paxCount)
-  }
-}
-
-case class GetAverageDelta(numberOfDays: Int)
