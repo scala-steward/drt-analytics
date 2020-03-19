@@ -11,7 +11,7 @@ lazy val postgresVersion = "42.2.2"
 lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.10.0"
-lazy val scalaTestVersion = "3.1.0"
+lazy val specs2Version = "4.6.0"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -28,7 +28,7 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % postgresVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
-  "org.scalatest" %% "scalatest" % scalaTestVersion % Test
+  "org.specs2" %% "specs2-core" % specs2Version % Test
   )
 
 lazy val root = (project in file("."))

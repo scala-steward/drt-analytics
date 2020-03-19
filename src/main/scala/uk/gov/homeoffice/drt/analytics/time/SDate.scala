@@ -10,6 +10,8 @@ case class SDate(dateTime: DateTime) {
 
   import uk.gov.homeoffice.drt.analytics.time.SDate.implicits._
 
+  val europeLondon: DateTimeZone = DateTimeZone.forID("Europe/London")
+
   def dayOfWeek: Int = dateTime.getDayOfWeek
 
   def fullYear: Int = dateTime.getYear
@@ -43,6 +45,13 @@ case class SDate(dateTime: DateTime) {
   def zone: String = dateTime.getZone.getID
 
   def timeZoneOffsetMillis: Long = dateTime.getZone.getOffset(millisSinceEpoch)
+
+  def toIsoMidnight = f"$fullYear%02d-$month%02d-$date%02dT00:00"
+
+  def getLocalLastMidnight: SDate = {
+    val localNow = SDate(dateTime, europeLondon)
+    SDate(localNow.toIsoMidnight, europeLondon)
+  }
 
 }
 
