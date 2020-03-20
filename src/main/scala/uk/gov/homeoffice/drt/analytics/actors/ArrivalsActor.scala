@@ -1,5 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
+import akka.actor.Props
 import akka.persistence._
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
@@ -11,6 +12,11 @@ import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, UniqueArrival}
 import scala.collection.mutable
 
 case class GetArrivals(firstDay: SDate, lastDay: SDate)
+
+object ArrivalsActor {
+  def props: (String, SDate) => Props = (persistenceId: String, pointInTime: SDate) =>
+    Props(new ArrivalsActor(persistenceId, pointInTime))
+}
 
 class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)

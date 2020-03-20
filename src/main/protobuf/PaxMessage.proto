@@ -9,5 +9,5 @@ message PaxCountMessage {
 }
 
 message PaxCountsMessage {
-    repeated PaxCountMessage counts =1;
+    repeated PaxCountMessage counts = 1;
 }

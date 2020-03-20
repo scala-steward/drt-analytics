@@ -24,10 +24,6 @@ object MessageConversion {
       fm.terminal.getOrElse(""),
       fm.origin.getOrElse(""),
       fm.status.getOrElse(""),
-      fm.estimated,
-      fm.touchdown,
-      fm.estimatedChox,
-      fm.actualChox,
       fm.actPax.getOrElse(0),
       fm.tranPax.getOrElse(0))
   }

@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Props}
 import akka.persistence._
 import org.slf4j.{Logger, LoggerFactory}
 import server.protobuf.messages.PaxMessage.{PaxCountMessage, PaxCountsMessage}
@@ -12,10 +12,14 @@ case class GetAverageDelta(numberOfDays: Int)
 
 case object Ack
 
-class OriginTerminalPassengersActor(origin: String, terminal: String) extends PersistentActor {
-  val log: Logger = LoggerFactory.getLogger(getClass)
+object OriginTerminalPassengersActor {
+  def props(origin: String, terminal: String): Props = Props(new OriginTerminalPassengersActor(origin, terminal))
+}
 
+class OriginTerminalPassengersActor(origin: String, terminal: String) extends PersistentActor {
   override val persistenceId = s"daily-origin-terminal-pax-$origin-$terminal"
+
+  val log: Logger = LoggerFactory.getLogger(persistenceId)
 
   var paxNosState: Map[(Long, Long), Int] = Map()
 
@@ -36,6 +40,10 @@ class OriginTerminalPassengersActor(origin: String, terminal: String) extends Pe
   }
 
   override def receiveCommand: Receive = {
+    case paxNosForDay: DailyPaxCountsOnDay if paxNosForDay.dailyPax.isEmpty =>
+      log.info(s"Received empty DailyPaxCountsOnDay")
+      sender() ! Ack
+
     case paxNosForDay: DailyPaxCountsOnDay =>
       log.info(s"Received DailyPaxCountsOnDay with ${paxNosForDay.dailyPax.size} updates")
       persistDiffAndUpdateState(paxNosForDay, sender())
@@ -57,9 +65,16 @@ class OriginTerminalPassengersActor(origin: String, terminal: String) extends Pe
   private def persistDiffAndUpdateState(paxNosForDay: DailyPaxCountsOnDay, replyTo: ActorRef): Unit = {
     val (newState, diff) = paxNosForDay.applyAndGetDiff(paxNosState)
 
-    persist(diff) { updates =>
-      PaxCountsMessage(updatesToMessages(updates))
-      paxNosState = newState
+    if (diff.nonEmpty) {
+      val message = PaxCountsMessage(updatesToMessages(diff))
+
+      persist(message) { toPersist =>
+        context.system.eventStream.publish(toPersist)
+        paxNosState = newState
+        replyTo ! Ack
+      }
+    } else {
+      log.info(s"Empty diff. Nothing to persist")
       replyTo ! Ack
     }
   }

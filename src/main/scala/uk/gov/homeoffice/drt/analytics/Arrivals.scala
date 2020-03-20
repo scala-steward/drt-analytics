@@ -10,24 +10,10 @@ case class Arrival(carrierCode: String,
                    terminal: String,
                    origin: String,
                    status: String,
-                   maybeEstimated: Option[Long],
-                   maybeTouchdown: Option[Long],
-                   maybeEstimatedChox: Option[Long],
-                   maybeActualChox: Option[Long],
                    actPax: Int,
                    transPax: Int
                   ) {
   def uniqueArrival: UniqueArrival = UniqueArrival(number, terminal, scheduled)
-
-  def bestTime: Long = maybeActualChox.getOrElse(
-    maybeEstimatedChox.getOrElse(
-      maybeTouchdown.getOrElse(
-        maybeEstimated.getOrElse(scheduled))))
-
-  def pcpStart: Long = {
-    val tenMinutesToPcp = 60 * 1000 * 10
-    bestTime + tenMinutesToPcp
-  }
 
   def isCancelled: Boolean = status match {
     case st if st.toLowerCase.contains("cancelled") => true
