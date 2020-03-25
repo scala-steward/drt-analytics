@@ -1,7 +1,15 @@
 package uk.gov.homeoffice.drt.analytics
 
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.analytics.DailyPaxCountsOnDay.applyDiffToExisting
 import uk.gov.homeoffice.drt.analytics.time.SDate
+
+case class OriginTerminalDailyPaxCountsOnDay(origin: String, terminal: String, counts: DailyPaxCountsOnDay) {
+  def applyAndGetDiff(existingCounts: Map[(Long, Long), Int]): (Map[(Long, Long), Int], Iterable[(Long, Long, Int)]) = {
+    val diff = counts.diffFromExisting(existingCounts)
+    (applyDiffToExisting(diff, existingCounts), diff)
+  }
+}
 
 case class DailyPaxCountsOnDay(dayMillis: Long, dailyPax: Map[Long, Int]) {
   val log: Logger = LoggerFactory.getLogger(getClass)
@@ -31,8 +39,10 @@ case class DailyPaxCountsOnDay(dayMillis: Long, dailyPax: Map[Long, Int]) {
   def applyToExisting(existingCounts: Map[(Long, Long), Int]): Map[(Long, Long), Int] =
     applyDiffToExisting(diffFromExisting(existingCounts), existingCounts)
 
-  def applyAndGetDiff(existingCounts: Map[(Long, Long), Int]): (Map[(Long, Long), Int], Iterable[(Long, Long, Int)]) =
-    (applyDiffToExisting(diffFromExisting(existingCounts), existingCounts), diffFromExisting(existingCounts))
+  def applyAndGetDiff(existingCounts: Map[(Long, Long), Int]): (Map[(Long, Long), Int], Iterable[(Long, Long, Int)]) = {
+    val diff = diffFromExisting(existingCounts)
+    (applyDiffToExisting(diff, existingCounts), diff)
+  }
 }
 
 object DailyPaxCountsOnDay {
