@@ -12,6 +12,8 @@ case class OriginAndTerminal(origin: String, terminal: String)
 
 case object ClearState
 
+case object Ack
+
 class PassengersActor extends PersistentActor {
   override val persistenceId = s"daily-pax"
 
