@@ -121,18 +121,14 @@ object DailySummaries {
             startDate: SDate,
             numberOfDays: Int,
             sourcesInOrder: List[String],
-            header: String,
-            dayOffset: Int)(implicit ec: ExecutionContext, system: ActorSystem): Future[List[String]] = {
+            dayOffset: Int)(implicit ec: ExecutionContext, system: ActorSystem): Future[String] = {
     val viewDate = startDate.addDays(dayOffset)
     val eventualCountsByOrigin = dailyPaxCountsForDayAndTerminalByOrigin(terminal, startDate, numberOfDays, sourcesInOrder, dayOffset)
 
     dailyOriginCountsToCsv(viewDate, startDate, numberOfDays, terminal, eventualCountsByOrigin)
-      .map { row =>
-        if (dayOffset == 0) List(header, row) else List(row)
-      }
       .recoverWith { case t =>
         log.error(s"Failed to get summaries", t)
-        Future(List())
+        Future("")
       }
   }
 

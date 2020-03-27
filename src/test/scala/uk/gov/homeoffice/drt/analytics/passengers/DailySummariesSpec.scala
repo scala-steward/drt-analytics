@@ -2,16 +2,14 @@ package uk.gov.homeoffice.drt.analytics.passengers
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.stream.ActorMaterializer
-import org.joda.time.DateTimeZone
-import org.specs2.mutable.Specification
+import akka.testkit.TestKit
+import org.specs2.mutable.SpecificationLike
 import uk.gov.homeoffice.drt.analytics.actors.{FeedPersistenceIds, GetArrivals}
-import uk.gov.homeoffice.drt.analytics.passengers.DailySummaries.log
 import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, DailyPaxCountsOnDay, UniqueArrival}
+import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, DailyPaxCountsOnDay}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.Success
 
 object MockArrivalsActor {
   def props: Arrivals => (String, SDate) => Props = (arrivals: Arrivals) => (_: String, _: SDate) => Props(new MockArrivalsActor(arrivals))
@@ -23,8 +21,7 @@ class MockArrivalsActor(arrivals: Arrivals) extends Actor {
   }
 }
 
-class DailySummariesSpec extends Specification {
-  implicit val system: ActorSystem = ActorSystem("DrtAnalytics")
+class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with SpecificationLike {
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
   implicit val mat: ActorMaterializer = ActorMaterializer()
 
