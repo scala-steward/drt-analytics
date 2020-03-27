@@ -36,13 +36,15 @@ object AnalyticsApp extends App {
       case None =>
         println(s"Invalid port code '$portCode''")
       case Some(terminals) =>
-        Source(terminals)
+        val eventualUpdates = Source(terminals)
           .flatMapConcat { terminal =>
             PaxDeltas.updateDailyPassengersByOriginAndDay(terminal.toUpperCase, PaxDeltas.startDate(daysToLookBack), daysToLookBack - 1, passengersActor)
           }
           .runWith(Sink.seq)
           .map(_.foreach(println))
-          .onComplete(_ => system.terminate().onComplete(_ => System.exit(0)))
+        Await.ready(eventualUpdates, 5 minutes)
+        system.terminate()
+        System.exit(0)
     }
   }
 

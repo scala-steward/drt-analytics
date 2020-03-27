@@ -36,6 +36,7 @@ libraryDependencies ++= Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "drt-analytics",
+    trapExit := false,
 
     PB.targets in Compile := Seq(
       scalapb.gen() -> (sourceManaged in Compile).value / "protobuf"
