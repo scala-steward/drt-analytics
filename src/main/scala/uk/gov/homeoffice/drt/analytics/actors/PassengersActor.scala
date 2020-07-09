@@ -3,8 +3,11 @@ package uk.gov.homeoffice.drt.analytics.actors
 import akka.actor.ActorRef
 import akka.persistence._
 import org.slf4j.{Logger, LoggerFactory}
-import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, PaxCountMessage}
+import scalapb.GeneratedMessage
+import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage}
 import uk.gov.homeoffice.drt.analytics.OriginTerminalDailyPaxCountsOnDay
+import uk.gov.homeoffice.drt.analytics.actors.PassengersActor.relevantPaxCounts
+import uk.gov.homeoffice.drt.analytics.time.SDate
 
 case class PointInTimeOriginTerminalDay(pointInTime: Long, origin: String, terminal: String, day: Long)
 
@@ -14,20 +17,25 @@ case object ClearState
 
 case object Ack
 
-class PassengersActor extends PersistentActor {
+object PassengersActor {
+  def relevantPaxCounts(numDaysInAverage: Int, now: () => SDate)(paxCountMessages: Seq[PaxCountMessage]): Seq[PaxCountMessage] = {
+    val cutoff = now().getLocalLastMidnight.addDays(-1 * numDaysInAverage).millisSinceEpoch
+    paxCountMessages.filter(msg => msg.getDay >= cutoff)
+  }
+}
+
+class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryActorLike {
   override val persistenceId = s"daily-pax"
 
-  val log: Logger = LoggerFactory.getLogger(persistenceId)
+  override val recoveryStartMillis: Long = now().millisSinceEpoch
 
-  var originTerminalPaxNosState: Map[OriginAndTerminal, Map[(Long, Long), Int]] = Map()
+  override val maybeSnapshotInterval: Option[Int] = Option(250)
 
-  override def receiveRecover: Receive = {
+  val filterRelevantPaxCounts: Seq[PaxCountMessage] => Seq[PaxCountMessage] = relevantPaxCounts(daysToRetain, now)
+
+  override def processRecoveryMessage: PartialFunction[Any, Unit] = {
     case OriginTerminalPaxCountsMessage(Some(origin), Some(terminal), countMessages) =>
-      log.info(s"Got a OriginTerminalPaxCountsMessage with ${countMessages.size} counts. Applying")
-      val updatesForOriginTerminal = messagesToUpdates(countMessages)
-      val originAndTerminal = OriginAndTerminal(origin, terminal)
-      val updatedOriginTerminal = originTerminalPaxNosState.getOrElse(originAndTerminal, Map()) ++ updatesForOriginTerminal
-      originTerminalPaxNosState = originTerminalPaxNosState.updated(originAndTerminal, updatedOriginTerminal)
+      applyPaxCountMessages(origin, terminal, countMessages)
 
     case _: OriginTerminalPaxCountsMessage =>
       log.warn(s"Ignoring OriginTerminalPaxCountsMessage with missing origin and/or terminal")
@@ -38,6 +46,34 @@ class PassengersActor extends PersistentActor {
     case u =>
       log.info(s"Got unexpected recovery msg: $u")
   }
+
+  private def applyPaxCountMessages(origin: String, terminal: String, countMessages: Seq[PaxCountMessage]): Unit = {
+    val relevantPaxCounts = filterRelevantPaxCounts(countMessages)
+    log.info(s"Applying ${relevantPaxCounts.size} counts for $origin -> $terminal")
+    val updatesForOriginTerminal = messagesToUpdates(relevantPaxCounts)
+    val originAndTerminal = OriginAndTerminal(origin, terminal)
+    val updatedOriginTerminal = originTerminalPaxNosState.getOrElse(originAndTerminal, Map()) ++ updatesForOriginTerminal
+    updateState(origin, terminal, updatedOriginTerminal)
+  }
+
+  override def processSnapshotMessage: PartialFunction[Any, Unit] = {
+    case OriginTerminalPaxCountsMessages(messages) => messages.map { message =>
+      applyPaxCountMessages(message.getOrigin, message.getTerminal, message.counts)
+    }
+  }
+
+  override def stateToMessage: GeneratedMessage = OriginTerminalPaxCountsMessages(
+    originTerminalPaxNosState.map {
+      case (OriginAndTerminal(origin, terminal), stuff) =>
+        OriginTerminalPaxCountsMessage(Option(origin), Option(terminal), updatesToMessages(stuff.map {
+          case ((a, b), c) => (a, b, c)
+        }))
+    }.toSeq
+  )
+
+  val log: Logger = LoggerFactory.getLogger(persistenceId)
+
+  var originTerminalPaxNosState: Map[OriginAndTerminal, Map[(Long, Long), Int]] = Map()
 
   override def receiveCommand: Receive = {
     case OriginTerminalDailyPaxCountsOnDay(_, _, paxNosForDay) if paxNosForDay.dailyPax.isEmpty =>
@@ -70,13 +106,17 @@ class PassengersActor extends PersistentActor {
 
       persist(message) { toPersist =>
         context.system.eventStream.publish(toPersist)
-        originTerminalPaxNosState = originTerminalPaxNosState.updated(OriginAndTerminal(origin, terminal), updateForState)
+        updateState(origin, terminal, updateForState)
         replyTo ! Ack
       }
     } else {
       log.info(s"Empty diff. Nothing to persist")
       replyTo ! Ack
     }
+  }
+
+  private def updateState(origin: String, terminal: String, updateForState: Map[(Long, Long), Int]): Unit = {
+    originTerminalPaxNosState = originTerminalPaxNosState.updated(OriginAndTerminal(origin, terminal), updateForState)
   }
 
   private def updatesToMessages(updates: Iterable[(Long, Long, Int)]): Seq[PaxCountMessage] = updates.map {
