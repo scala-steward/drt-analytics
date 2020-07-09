@@ -3,7 +3,6 @@ pipeline:
     image: quay.io/ukhomeofficedigital/sonar-scanner:v3.0.1
     when:
       event: push
-      branch: ${DRONE_BRANCH}
 
   build:
     image: quay.io/ukhomeofficedigital/scala-sbt:latest
@@ -15,10 +14,7 @@ pipeline:
     secrets:
     - ARTIFACTORY_PASSWORD
     when:
-      event:
-      - push
-      branch:
-      - ${DRONE_BRANCH}
+      event: push
 
   build_push_to_ecr:
     image: quay.io/ukhomeofficedigital/ecr:latest
@@ -32,3 +28,5 @@ pipeline:
     - latest
     - ${DRONE_COMMIT_SHA}
     - ${DRONE_BUILD_NUMBER}
+    when:
+      event: push
