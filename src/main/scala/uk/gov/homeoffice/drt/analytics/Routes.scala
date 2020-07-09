@@ -13,6 +13,7 @@ import akka.stream.ActorMaterializer
 import akka.util.{ByteString, Timeout}
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.PassengersActor
+import uk.gov.homeoffice.drt.analytics.time.SDate
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
@@ -33,7 +34,7 @@ object Routes {
   }
   implicit val csvStreamingSupport: CsvEntityStreamingSupport = EntityStreamingSupport.csv()
 
-  val passengersActor: AskableActorRef = system.actorOf(Props(new PassengersActor()))
+  val passengersActor: AskableActorRef = system.actorOf(Props(new PassengersActor(() => SDate.now(), 30)))
 
   def routes: Route = concat(
     pathPrefix("daily-pax" / Segments(2)) {
