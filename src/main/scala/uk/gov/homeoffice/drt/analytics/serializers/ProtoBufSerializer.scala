@@ -1,9 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.serializers
 
 import akka.serialization.SerializerWithStringManifest
-import org.slf4j.{Logger, LoggerFactory}
 import server.protobuf.messages.FlightsMessage._
-import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, PaxCountMessage, PaxCountsMessage}
+import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage, PaxCountsMessage}
 
 class ProtoBufSerializer extends SerializerWithStringManifest {
   override def identifier: Int = 9001
@@ -19,6 +18,7 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
   final val PaxCount: String                      = classOf[PaxCountMessage].getName
   final val PaxCounts: String                     = classOf[PaxCountsMessage].getName
   final val OriginTerminalPaxCounts: String       = classOf[OriginTerminalPaxCountsMessage].getName
+  final val OriginTerminalPaxCountss: String      = classOf[OriginTerminalPaxCountsMessages].getName
 
   override def toBinary(objectToSerialize: AnyRef): Array[Byte] = {
     objectToSerialize match {
@@ -31,6 +31,7 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
       case m: PaxCountMessage => m.toByteArray
       case m: PaxCountsMessage => m.toByteArray
       case m: OriginTerminalPaxCountsMessage => m.toByteArray
+      case m: OriginTerminalPaxCountsMessages => m.toByteArray
     }
   }
 
@@ -45,6 +46,7 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
       case PaxCount                       => PaxCountMessage.parseFrom(bytes)
       case PaxCounts                      => PaxCountsMessage.parseFrom(bytes)
       case OriginTerminalPaxCounts        => OriginTerminalPaxCountsMessage.parseFrom(bytes)
+      case OriginTerminalPaxCountss       => OriginTerminalPaxCountsMessages.parseFrom(bytes)
     }
   }
 }
