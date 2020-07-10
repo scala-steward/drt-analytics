@@ -1,7 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.AskableActorRef
+import akka.persistence.SaveSnapshotSuccess
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
@@ -14,6 +15,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
+
+class SnapshotTestPassengersActor(now: () => SDate, daysToRetain: Int, probe: ActorRef) extends PassengersActor(now, daysToRetain) {
+  override val maybeSnapshotInterval: Option[Int] = Option(1)
+
+  override def receiveCommand: Receive = receiveForProbe orElse super.receiveCommand
+
+  def receiveForProbe: Receive = {
+    case saveSuccess: SaveSnapshotSuccess => probe ! saveSuccess
+  }
+}
 
 class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with SpecificationLike with AfterAll with BeforeEach {
   sequential
@@ -36,10 +47,10 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
   val terminal = "T1"
   val date20200301: SDate = SDate("2020-03-01")
 
-  "Given a PassengersActor" >> {
-    val dailyPax = DailyPaxCountsOnDay(date20200301.millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
-    val otDailyPax = OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPax)
+  val dailyPax: DailyPaxCountsOnDay = DailyPaxCountsOnDay(date20200301.millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
+  val otDailyPax: OriginTerminalDailyPaxCountsOnDay = OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPax)
 
+  "Given a PassengersActor" >> {
     "When I send it some counts for an origin and terminal and then ask for the counts" >> {
       "Then I should get back the counts I sent it" >> {
         val actor: AskableActorRef = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
@@ -84,6 +95,19 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
 
         val result = Await.result(eventualCounts, 5 second)
         result === Option(Map((date20200301.millisSinceEpoch, date20200301.millisSinceEpoch) -> 100))
+      }
+    }
+  }
+
+  "Given a PassengersActor configured to snapshot on every message persistence" >> {
+    "When I send it an update to persist" >> {
+      "I should see it receive a SaveSnapshotSuccess message" >> {
+        val probe = TestProbe("snapshot-probe")
+        val actor = system.actorOf(Props(new SnapshotTestPassengersActor(() => date20200301, 30, probe.ref)))
+        actor ! otDailyPax
+
+        probe.expectMsgClass(classOf[SaveSnapshotSuccess])
+        success
       }
     }
   }
