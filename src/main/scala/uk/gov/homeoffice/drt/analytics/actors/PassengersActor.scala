@@ -85,10 +85,15 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
       persistDiffAndUpdateState(originTerminalPaxNosForDay, sender())
 
     case oAndT: OriginAndTerminal =>
-      println(s"state: $originTerminalPaxNosState")
       sender() ! originTerminalPaxNosState.get(oAndT)
 
     case ClearState => originTerminalPaxNosState = Map()
+
+    case SaveSnapshotSuccess(md) =>
+      log.info(s"Save snapshot success: $md")
+
+    case SaveSnapshotFailure(md, cause) =>
+      log.error(s"Save snapshot failure: $md", cause)
 
     case u =>
       log.info(s"Got unexpected command: $u")
@@ -104,11 +109,8 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
     if (diff.nonEmpty) {
       val message = OriginTerminalPaxCountsMessage(Option(origin), Option(terminal), updatesToMessages(diff))
 
-      persist(message) { toPersist =>
-        context.system.eventStream.publish(toPersist)
-        updateState(origin, terminal, updateForState)
-        replyTo ! Ack
-      }
+      persistAndMaybeSnapshot(message, Option((replyTo, Ack)))
+      updateState(origin, terminal, updateForState)
     } else {
       log.info(s"Empty diff. Nothing to persist")
       replyTo ! Ack
