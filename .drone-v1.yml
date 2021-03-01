@@ -18,7 +18,7 @@ steps:
   environment:
     ARTIFACTORY_PASSWORD:
       from_secret: ARTIFACTORY_PASSWORD
-    ARTIFACTORY_USERNAME: drt_artifactory_ci
+    ARTIFACTORY_USERNAME: ben.eppel@digital.homeoffice.gov.uk
   when:
     branch:
       - ${DRONE_BRANCH}
