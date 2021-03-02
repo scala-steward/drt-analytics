@@ -18,7 +18,7 @@ steps:
   environment:
     ARTIFACTORY_PASSWORD:
       from_secret: ARTIFACTORY_PASSWORD
-    ARTIFACTORY_USERNAME: ben.eppel@digital.homeoffice.gov.uk
+    ARTIFACTORY_USERNAME: drt-artifactory-ci
   when:
     branch:
       - ${DRONE_BRANCH}
@@ -42,5 +42,6 @@ steps:
   when:
     event:
       - push
+
 
 ...
