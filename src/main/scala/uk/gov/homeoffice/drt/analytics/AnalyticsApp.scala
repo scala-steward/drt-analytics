@@ -34,7 +34,10 @@ object AnalyticsApp extends App {
 
     Ports.terminals.get(portCode) match {
       case None =>
-        println(s"Invalid port code '$portCode''")
+        log.error(s"Invalid port code '$portCode''")
+        system.terminate()
+        System.exit(0)
+
       case Some(terminals) =>
         val eventualUpdates = Source(terminals)
           .flatMapConcat { terminal =>
