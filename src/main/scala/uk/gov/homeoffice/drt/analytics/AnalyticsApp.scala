@@ -74,7 +74,7 @@ object Ports {
     "bhx" -> List("t1", "t2"),
     "brs" -> List("t1"),
     "edi" -> List("t1"),
-    "ema" -> List("a1", "a2"),
+    "ema" -> List("t1"),
     "gla" -> List("t1"),
     "lcy" -> List("t1"),
     "lgw" -> List("n", "s"),
