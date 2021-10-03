@@ -26,7 +26,7 @@ object AnalyticsApp extends App {
   implicit val timeout: Timeout = new Timeout(5 seconds)
 
   val isInteractive = config.getBoolean("interactive-mode")
-  val portCode = config.getString("portcode")
+  val portCode = PortCode(config.getString("port-code").toUpperCase)
   val daysToLookBack = config.getInt("days-to-look-back")
 
   if (isInteractive) startInteractiveMode else runNonInteractiveMode
@@ -34,7 +34,7 @@ object AnalyticsApp extends App {
   private def runNonInteractiveMode: Any = {
     log.info(s"Starting in non-interactive mode")
 
-    AirportConfigs.confByPort.get(PortCode(portCode.toUpperCase)) match {
+    AirportConfigs.confByPort.get(portCode) match {
       case None =>
         log.error(s"Invalid port code '$portCode''")
         system.terminate()
