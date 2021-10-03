@@ -8,6 +8,8 @@ import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.Routes.passengersActor
+import uk.gov.homeoffice.drt.ports.PortCode
+import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -32,16 +34,16 @@ object AnalyticsApp extends App {
   private def runNonInteractiveMode: Any = {
     log.info(s"Starting in non-interactive mode")
 
-    Ports.terminals.get(portCode) match {
+    AirportConfigs.confByPort.get(PortCode(portCode.toUpperCase)) match {
       case None =>
         log.error(s"Invalid port code '$portCode''")
         system.terminate()
         System.exit(0)
 
-      case Some(terminals) =>
-        val eventualUpdates = Source(terminals)
+      case Some(portConfig) =>
+        val eventualUpdates = Source(portConfig.terminals.toList)
           .flatMapConcat { terminal =>
-            PaxDeltas.updateDailyPassengersByOriginAndDay(terminal.toUpperCase, PaxDeltas.startDate(daysToLookBack), daysToLookBack - 1, passengersActor)
+            PaxDeltas.updateDailyPassengersByOriginAndDay(terminal.toString.toUpperCase, PaxDeltas.startDate(daysToLookBack), daysToLookBack - 1, passengersActor)
           }
           .runWith(Sink.seq)
           .map(_.foreach(println))
@@ -65,24 +67,4 @@ object AnalyticsApp extends App {
     }
     Await.result(system.whenTerminated, Duration.Inf)
   }
-}
-
-object Ports {
-  val terminals = Map(
-    "bfs" -> List("t1"),
-    "bhd" -> List("t1"),
-    "bhx" -> List("t1", "t2"),
-    "brs" -> List("t1"),
-    "edi" -> List("t1"),
-    "ema" -> List("t1"),
-    "gla" -> List("t1"),
-    "lcy" -> List("t1"),
-    "lgw" -> List("n", "s"),
-    "lhr" -> List("t2", "t3", "t4", "t5"),
-    "lpl" -> List("t1"),
-    "ltn" -> List("t1"),
-    "man" -> List("t1", "t2", "t3"),
-    "ncl" -> List("t1"),
-    "stn" -> List("t1")
-    )
 }

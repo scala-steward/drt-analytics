@@ -13,6 +13,7 @@ lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.10.0"
 lazy val specs2Version = "4.6.0"
+lazy val drtLib = "v50"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -30,8 +31,9 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % postgresVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
-  "org.specs2" %% "specs2-core" % specs2Version % Test
-  )
+  "org.specs2" %% "specs2-core" % specs2Version % Test,
+  "uk.gov.homeoffice" %%% "drt-lib" % drtLib,
+)
 
 lazy val root = (project in file("."))
   .settings(
@@ -40,8 +42,12 @@ lazy val root = (project in file("."))
 
     PB.targets in Compile := Seq(
       scalapb.gen() -> (sourceManaged in Compile).value / "protobuf"
-      ),
-    PB.deleteTargetDirectory := false
-    )
+    ),
+    PB.deleteTargetDirectory := false,
+
+    resolvers += "Artifactory Realm" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
+    credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
+
+  )
   .enablePlugins(DockerPlugin)
   .enablePlugins(AshScriptPlugin)
