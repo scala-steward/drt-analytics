@@ -45,7 +45,8 @@ lazy val root = (project in file("."))
     ),
     PB.deleteTargetDirectory := false,
 
-    resolvers += "Artifactory Realm" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
+    resolvers += "Artifactory Realm" at "https://artifactory.digital.homeoffice.gov.uk/",
+    resolvers += "Artifactory Realm release local" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
 
   )
