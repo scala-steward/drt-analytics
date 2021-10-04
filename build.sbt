@@ -13,7 +13,7 @@ lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.10.0"
 lazy val specs2Version = "4.6.0"
-lazy val drtLib = "v50"
+lazy val drtLib = "v51"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
