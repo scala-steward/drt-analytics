@@ -9,7 +9,7 @@ platform:
 
 steps:
 
-- name: build
+- name: Build
   pull: if-not-exists
   image: quay.io/ukhomeofficedigital/scala-sbt:latest
   commands:
@@ -20,12 +20,10 @@ steps:
       from_secret: ARTIFACTORY_PASSWORD
     ARTIFACTORY_USERNAME: scala-test-token
   when:
-    branch:
-      - ${DRONE_BRANCH}
     event:
       - push
 
-- name: publish
+- name: Publish
   image: plugins/ecr
   environment:
     AWS_REGION: eu-west-2
@@ -42,6 +40,8 @@ steps:
   when:
     event:
       - push
+  depend_on:
+    - Build
 
 
 ...
