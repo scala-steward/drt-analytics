@@ -55,7 +55,7 @@ steps:
     when:
       event:
         - push
-    depend_on:
+    depends_on:
       - Build docker image
 
 ...
