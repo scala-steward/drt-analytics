@@ -27,4 +27,8 @@
         <appender-ref ref="ASYNC"/>
     </root>
 
+    <logger level="WARN" name="org.apache.spark" />
+    <logger level="WARN" name="breeze.optimize" />
+    <logger level="WARN" name="org.sparkproject" />
+
 </configuration>
