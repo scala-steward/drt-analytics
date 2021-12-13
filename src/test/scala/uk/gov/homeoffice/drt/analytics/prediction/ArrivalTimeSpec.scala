@@ -1,68 +1,63 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.actor.{ActorSystem, PoisonPill, Props}
+import akka.pattern.ask
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
+import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import server.protobuf.messages.FlightsMessage.FlightsWithSplitsDiffMessage
-import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.ports.Terminals.T2
 
-import scala.util.matching.Regex
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
-case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
-
-class TerminalDayFlightActor(terminal: Terminal, year: Int, month: Int, day: Int) extends PersistentActor {
-  override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-$year-$month%02d-$day%02d"
-
-  // (flight code, terminal) -> scheduled -> minute off scheduled
-  var arrivals: Map[(String, String), Map[Long, Int]] = Map()
-  var byKey: Map[ArrivalKey, Int] = Map()
-
-  def parseFlightNumber(code: String): Int = {
-    val flightCodeRegex: Regex = "^([A-Z0-9]{2,3}?)([0-9]{1,4})([A-Z]*)$".r
-
-    code match {
-      case flightCodeRegex(operator, flightNumber, suffix) =>
-        val number = f"${flightNumber.toInt}%04d"
-        f"$operator$number$suffix"
-      case _ => code
-    }
-
-
-  }
-
-  override def receiveRecover: Receive = {
-    case RecoveryCompleted =>
-    case FlightsWithSplitsDiffMessage(_, removals, updates) =>
-      updates.map { u =>
-        for {
-          flightCode <- u.getFlight.iATA
-          terminal <- u.getFlight.terminal
-          scheduled <- u.getFlight.scheduled
-          touchdown <- u.getFlight.touchdown
-        } yield {
-          byKey = byKey.updated(ArrivalKey(scheduled, terminal, parseFlightNumber()))
-          val updatedMinutesOffScheduled = arrivals.getOrElse((flightCode, terminal), Map()).updated(scheduled, touchdown - scheduled)
-          arrivals = arrivals.updated((flightCode, terminal), updatedMinutesOffScheduled)
-        }
-      }
-      removals.map { r =>
-        for {
-          scheduled <- r.scheduled
-          terminal <- r.terminalName
-          flightNumber <- r.number
-        } yield {
-
-        }
-      }
-  }
-
-  override def receiveCommand: Receive = {
-
-  }
-}
 
 class ArrivalTimeSpec extends AnyWordSpec with Matchers {
-  "An arrivals actor" should {
-    ""
+  implicit val timeout: Timeout = new Timeout(1.second)
+  "A MinutesOffScheduledActor" should {
+    "recover some state" in {
+      val system = ActorSystem("test")
+      implicit val ec: ExecutionContextExecutor = system.dispatcher
+      val actor = system.actorOf(Props(new MinutesOffScheduledActor(T2, 2020, 10, 1)))
+      val result = Await.result(actor.ask(GetState).mapTo[Map[ArrivalKey, Int]], 1.second)
+
+      system.terminate()
+
+      result.size should not be (0)
+    }
+  }
+
+  "A MinutesOffScheduledActor" should {
+    "provide a stream of arrivals across a day range" in {
+      val system = ActorSystem("test")
+      implicit val ec: ExecutionContextExecutor = system.dispatcher
+      implicit val mat: ActorMaterializer = ActorMaterializer.create(system)
+
+      val start = SDate(2020, 10, 1, 0, 0)
+      val days = 10
+
+      val arrivals = Source((0 until days).toList).mapAsync(1) { day =>
+        val currentDay = start.addDays(day)
+        val actor = system.actorOf(Props(new MinutesOffScheduledActor(T2, currentDay.fullYear, currentDay.month, currentDay.date)))
+        actor
+          .ask(GetState).mapTo[Map[ArrivalKey, Int]]
+          .map { arrivals =>
+            actor ! PoisonPill
+            arrivals
+          }
+      }
+
+      val result = Await.result(arrivals.runFold(Map[ArrivalKey, Int]())(_ ++ _), 5.seconds)
+
+      val byDay = result.keys.groupBy {
+        case ArrivalKey(scheduled, _, _) => SDate(scheduled).date
+      }
+
+      byDay.forall(_._2.nonEmpty) should be (true)
+    }
   }
 }

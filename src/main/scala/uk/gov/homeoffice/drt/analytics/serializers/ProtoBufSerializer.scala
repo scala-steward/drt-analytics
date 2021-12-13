@@ -1,6 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.serializers
 
 import akka.serialization.SerializerWithStringManifest
+import server.protobuf.messages.CrunchState.{FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import server.protobuf.messages.FlightsMessage._
 import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage, PaxCountsMessage}
 
@@ -19,6 +20,8 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
   final val PaxCounts: String                     = classOf[PaxCountsMessage].getName
   final val OriginTerminalPaxCounts: String       = classOf[OriginTerminalPaxCountsMessage].getName
   final val OriginTerminalPaxCountss: String      = classOf[OriginTerminalPaxCountsMessages].getName
+  final val FlightsWithSplits: String             = classOf[FlightsWithSplitsMessage].getName
+  final val FlightsWithSplitsDiff: String         = classOf[FlightsWithSplitsDiffMessage].getName
 
   override def toBinary(objectToSerialize: AnyRef): Array[Byte] = {
     objectToSerialize match {
@@ -32,6 +35,8 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
       case m: PaxCountsMessage => m.toByteArray
       case m: OriginTerminalPaxCountsMessage => m.toByteArray
       case m: OriginTerminalPaxCountsMessages => m.toByteArray
+      case m: FlightsWithSplitsMessage => m.toByteArray
+      case m: FlightsWithSplitsDiffMessage => m.toByteArray
     }
   }
 
@@ -47,6 +52,8 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
       case PaxCounts                      => PaxCountsMessage.parseFrom(bytes)
       case OriginTerminalPaxCounts        => OriginTerminalPaxCountsMessage.parseFrom(bytes)
       case OriginTerminalPaxCountss       => OriginTerminalPaxCountsMessages.parseFrom(bytes)
+      case FlightsWithSplits              => FlightsWithSplitsMessage.parseFrom(bytes)
+      case FlightsWithSplitsDiff          => FlightsWithSplitsDiffMessage.parseFrom(bytes)
     }
   }
 }
