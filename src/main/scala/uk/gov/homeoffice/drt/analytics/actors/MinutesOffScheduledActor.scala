@@ -1,10 +1,17 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
+import akka.NotUsed
+import akka.actor.{ActorSystem, PoisonPill, Props}
+import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.stream.scaladsl.Source
+import akka.util.Timeout
 import server.protobuf.messages.CrunchState.FlightsWithSplitsDiffMessage
 import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
-import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
 
+import scala.concurrent.ExecutionContext
 import scala.util.Try
 import scala.util.matching.Regex
 
@@ -13,6 +20,19 @@ object MinutesOffScheduledActor {
   case object GetState
 
   case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
+
+  def byDaySource(startDate: SDate, numberOfDays: Int)
+                 (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[Map[ArrivalKey, Int], NotUsed] =
+    Source((0 until numberOfDays).toList).mapAsync(1) { day =>
+      val currentDay = startDate.addDays(day)
+      val actor = system.actorOf(Props(new MinutesOffScheduledActor(T2, currentDay.fullYear, currentDay.month, currentDay.date)))
+      actor
+        .ask(GetState).mapTo[Map[ArrivalKey, Int]]
+        .map { arrivals =>
+          actor ! PoisonPill
+          arrivals
+        }
+    }
 }
 
 
