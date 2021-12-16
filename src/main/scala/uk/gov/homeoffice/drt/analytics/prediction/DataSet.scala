@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
+import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
 import org.slf4j.{Logger, LoggerFactory}
@@ -19,14 +19,19 @@ case class DataSet[T](df: DataFrame, columnNames: Seq[String], featureSpecs: Lis
   lazy val lr = new LinearRegression()
 
   def trainModel(labelCol: String, trainingSplitPercentage: Int)
-                (implicit session: SparkSession): LinearRegressionModel = {
-    lr.fit(prepare(labelCol, trainingSplitPercentage, sortAscending = true))
-  }
+                (implicit session: SparkSession): LinearRegressionModel =
+    lr
+      .setRegParam(1)
+      .fit(prepare(labelCol, trainingSplitPercentage, sortAscending = true))
+
+  def evaluate(labelCol: String, trainingSplitPercentage: Int, model: LinearRegressionModel)
+              (implicit session: SparkSession): LinearRegressionSummary =
+    model.evaluate(prepare(labelCol, trainingSplitPercentage, sortAscending = true))
 
   def predict(labelCol: String, predictionSplitPercentage: Int, model: LinearRegressionModel)
              (implicit session: SparkSession): DataFrame =
     model
-      .transform(prepare(labelCol, predictionSplitPercentage, sortAscending = false))
+      .transform(prepare(labelCol, 100 - predictionSplitPercentage, sortAscending = false))
       .select(col("index"), col("prediction"))
       .sort(col("index"))
 
