@@ -92,16 +92,17 @@ class ArrivalTimeSpec2 extends AnyWordSpec with Matchers {
               .filter(_._2.size > 10)
               .map {
                 case ((terminal, number), offScheduleds) =>
+                  println(s"\nNext training set")
                   val carriers = offScheduleds.map(_._2._3).toSet
-                  val scheduleds = offScheduleds.keys.map(s => f"${SDate(s).hours}%02d:${SDate(s).minutes}%02d")
+                  val scheduleds = offScheduleds.keys.map(s => SDate(s).hours / 12).toSet
                   if (carriers.size > 1) println(s"carriers: $carriers")
                   if (scheduleds.size > 1) println(s"scheduleds: $scheduleds")
                   val withIndex = offScheduleds.map { case (sch, (off, origin, carrier)) => (sch, (off / 60000, origin)) }.zipWithIndex
                   val dataFrame = withIndex
                     .map {
                       case ((scheduled, (offScheduled, _)), idx) =>
-                        val hhmm = f"${SDate(scheduled).hours}%02d:${SDate(scheduled).minutes}%02d"
-                        (offScheduled.toDouble, SDate(scheduled).dayOfWeek, hhmm, idx.toString)
+                        val mornAft = s"${SDate(scheduled).hours / 12}"
+                        (offScheduled.toDouble, SDate(scheduled).dayOfWeek.toString, mornAft, idx.toString)
                     }
                     .toList.toDF(columnNames: _*)
                     .sort("label")
@@ -114,12 +115,12 @@ class ArrivalTimeSpec2 extends AnyWordSpec with Matchers {
                   val upperRange = q3 + 1.5 * iqr
                   val withoutOutliers = dataFrame.filter(s"$lowerRange < label and label < $upperRange")
 
-                  println(s"\nTraining on ${(offScheduleds.size.toDouble * 0.8).toInt} examples")
+                  println(s"Training on ${(offScheduleds.size.toDouble * 0.8).toInt} examples")
 
                   val dataSet = DataSet(withoutOutliers, columnNames, features)
                   val model: LinearRegressionModel = dataSet.trainModel("label", 80)
                   model.coefficients.toArray
-                  new LinearRegressionModel()
+//                  new LinearRegressionModel()
                   //val serialised = model.ser
                   val lrSummary = dataSet.evaluate("label", 80, model)
                   println(s"Summary: RMSE ${lrSummary.rootMeanSquaredError.round}, R2 ${lrSummary.r2}")

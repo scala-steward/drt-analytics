@@ -1,20 +1,18 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
-import org.slf4j.{Logger, LoggerFactory}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.{FeatureType, OneToMany, Single}
 
-import scala.collection.immutable
-
 case class DataSet[T](df: DataFrame, columnNames: Seq[String], featureSpecs: List[FeatureType]) {
-  private val log: Logger = LoggerFactory.getLogger(getClass)
-
   val dfIndexed: DataFrame = df.withColumn("_index", monotonically_increasing_id())
 
+  val oneToManyFeatures: IndexedSeq[String] = extractOneToManyFeatures(df)
+
   val numRows: Long = dfIndexed.count()
+
+  val features: Features = Features(df, featureSpecs)
 
   lazy val lr = new LinearRegression()
 
@@ -39,7 +37,6 @@ case class DataSet[T](df: DataFrame, columnNames: Seq[String], featureSpecs: Lis
              (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
-    val oneToManyFeatures = extractOneToManyFeatures(df)
 
     val featureColumns = featureSpecs.map {
       case OneToMany(columnNames, _) => concat_ws("-", columnNames.map(col): _*)
@@ -57,24 +54,10 @@ case class DataSet[T](df: DataFrame, columnNames: Seq[String], featureSpecs: Lis
       .limit(partitionIndexValue)
       .collect.toSeq
       .map { row =>
-        val oneToManyValues: immutable.Seq[(Int, Double)] = featureSpecs
-          .zipWithIndex
-          .collect {
-            case (otm: OneToMany, idx) => (otm, idx)
-          }
-          .map {
-            case (fs, idx) =>
-              val featureString = s"${fs.featurePrefix}${row.getAs[String](idx + 1)}"
-              val featureIdx = oneToManyFeatures.indexOf(featureString)
-              (featureIdx, 1d)
-          }
-        val singleValues = featureSpecs.collect {
-          case Single(columnName) => row.getAs[Double](columnName)
-        }
-
-        val featureValues = Vectors.sparse(oneToManyFeatures.length, oneToManyValues).toArray ++ singleValues
-
-        (row.getAs[Double](0), Vectors.dense(featureValues), row.getAs[String]("index"))
+        val label = row.getAs[Double](0)
+        val featuresVector = features.featuresVectorForRow(row)
+        val index = row.getAs[String]("index")
+        (label, featuresVector, index)
       }
       .toDF("label", "features", "index")
 
