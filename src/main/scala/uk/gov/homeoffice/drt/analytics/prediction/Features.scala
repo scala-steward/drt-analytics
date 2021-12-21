@@ -3,21 +3,20 @@ package uk.gov.homeoffice.drt.analytics.prediction
 import org.apache.spark.ml.linalg
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.{col, concat_ws}
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.{FeatureType, OneToMany, Single}
 
 import scala.collection.immutable
 
-case class Features(featureSpecs: List[FeatureType], oneToManyValues: IndexedSeq[String]) {
+case class Features(featureTypes: List[FeatureType], oneToManyValues: IndexedSeq[String]) {
   def oneToManyIndices(row: Row): immutable.Seq[Int] =
-    featureSpecs
+    featureTypes
       .collect {
         case otm: OneToMany => otm
       }
       .map { fs =>
         val featureColValues = fs.columnNames.map(c => row.getAs[String](c))
         val featureString = s"${fs.featurePrefix}_${featureColValues.mkString("-")}"
-//        println(s"looking for $featureString")
         oneToManyValues.indexOf(featureString)
       }
       .filter(_ >= 0)
@@ -25,12 +24,21 @@ case class Features(featureSpecs: List[FeatureType], oneToManyValues: IndexedSeq
   def oneToManyFeaturesIndices(row: Row): Array[Double] =
     Vectors.sparse(oneToManyValues.size, oneToManyIndices(row).map(idx => (idx, 1d))).toArray
 
-  def singleFeaturesVector(row: Row): List[Double] = featureSpecs.collect {
+  def singleFeaturesVector(row: Row): List[Double] = featureTypes.collect {
     case Single(columnName) => row.getAs[Double](columnName)
   }
 
   def featuresVectorForRow(row: Row): linalg.Vector =
     Vectors.dense(oneToManyFeaturesIndices(row) ++ singleFeaturesVector(row))
+
+  def labelAndFeatureCols(allColumns: Iterable[String], labelColName: String)
+                         (implicit session: SparkSession): immutable.Seq[Column] = {
+    val featureColumns = featureTypes.map {
+      case OneToMany(columnNames, _) => concat_ws("-", columnNames.map(col): _*)
+      case Single(columnName) => col(columnName)
+    }
+    col(labelColName) :: (featureColumns ++ allColumns.map(col))
+  }
 }
 
 object Features {

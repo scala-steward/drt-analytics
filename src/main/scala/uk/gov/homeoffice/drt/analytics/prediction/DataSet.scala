@@ -2,10 +2,12 @@ package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.{FeatureType, OneToMany, Single}
 
-case class DataSet[T](df: DataFrame, columnNames: Seq[String], featureSpecs: List[FeatureType]) {
+import scala.collection.immutable
+
+case class DataSet(df: DataFrame, featureSpecs: List[FeatureType]) {
   val dfIndexed: DataFrame = df.withColumn("_index", monotonically_increasing_id())
 
   val oneToManyFeatures: IndexedSeq[String] = extractOneToManyFeatures(df)
@@ -37,12 +39,7 @@ case class DataSet[T](df: DataFrame, columnNames: Seq[String], featureSpecs: Lis
              (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
-
-    val featureColumns = featureSpecs.map {
-      case OneToMany(columnNames, _) => concat_ws("-", columnNames.map(col): _*)
-      case Single(columnName) => col(columnName)
-    }
-    val labelAndFeatures = col(labelColName) :: (featureColumns ++ columnNames.map(col))
+    val labelAndFeatures: immutable.Seq[Column] = features.labelAndFeatureCols(df.columns, labelColName)
 
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 

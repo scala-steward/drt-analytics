@@ -27,7 +27,7 @@ class BasicLearning extends AnyWordSpec with Matchers {
 
       val featureSpecs = List(Single("p1"))
 
-      trainAndPredict(colNames, data, featureSpecs).values.map(_.round) should ===(Array(3d, 4d))
+      trainAndPredict(data, featureSpecs).values.map(_.round) should ===(Array(3d, 4d))
     }
 
     "train a model with 5 coefficients when given 1 single value feature and a one to many feature with 4 values (p2)" in {
@@ -42,12 +42,12 @@ class BasicLearning extends AnyWordSpec with Matchers {
 
       val featureSpecs = List(OneToMany(List("p2"), "f1"), Single("p1"))
 
-      DataSet(data, colNames, featureSpecs).trainModel("target", 100).coefficients.size should ===(5)
+      DataSet(data, featureSpecs).trainModel("target", 100).coefficients.size should ===(5)
     }
   }
 
-  private def trainAndPredict(colNames: Seq[String], data: DataFrame, featureSpecs: List[FeatureType]): Map[String, Double] = {
-    val dataSet = DataSet(data, colNames, featureSpecs)
+  private def trainAndPredict(data: DataFrame, featureSpecs: List[FeatureType]): Map[String, Double] = {
+    val dataSet = DataSet(data, featureSpecs)
 
     val model = dataSet.trainModel("target", 50)
 

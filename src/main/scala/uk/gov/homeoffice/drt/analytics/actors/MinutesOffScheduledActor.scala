@@ -7,7 +7,7 @@ import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import server.protobuf.messages.CrunchState.FlightsWithSplitsDiffMessage
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 
@@ -15,43 +15,46 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.util.matching.Regex
 
-
 object MinutesOffScheduledActor {
   case object GetState
 
   case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
 
-  def offScheduledByTerminalFlightNumber(terminal: Terminal, startDate: SDate, numberOfDays: Int)
-                                        (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[((String, Int), Map[Long, Int]), NotUsed] =
+  case class ArrivalKeyWithOrigin(scheduled: Long, terminal: String, number: Int, origin: String)
+
+  def offScheduledByTerminalFlightNumberOrigin(terminal: Terminal, startDate: SDate, numberOfDays: Int)
+                                              (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[((String, Int, String), Map[Long, Int]), NotUsed] =
     Source((0 until numberOfDays).toList)
       .mapAsync(1)(day => arrivalsWithOffScheduledForDate(terminal, startDate.addDays(day)))
-      .map(byTerminalAndFlightNumber)
-      .fold(Map[(String, Int), Map[Long, Int]]()) {
+      .map(byTerminalFlightNumberAndOrigin)
+      .fold(Map[(String, Int, String), Map[Long, Int]]()) {
         case (acc, incoming) => addByTerminalAndFlightNumber(acc, incoming)
       }
       .mapConcat(identity)
 
-  private def addByTerminalAndFlightNumber(acc: Map[(String, Int), Map[Long, Int]], incoming: Map[(String, Int), Map[Long, Int]]): Map[(String, Int), Map[Long, Int]] =
+  private def addByTerminalAndFlightNumber(acc: Map[(String, Int, String), Map[Long, Int]], incoming: Map[(String, Int, String), Map[Long, Int]]): Map[(String, Int, String), Map[Long, Int]] =
     incoming.foldLeft(acc) {
       case (acc, (key, arrivals)) => acc.updated(key, acc.getOrElse(key, Map()) ++ arrivals)
     }
 
-  private def byTerminalAndFlightNumber(byArrivalKey: Map[ArrivalKey, Int]): Map[(String, Int), Map[Long, Int]] =
+  private def byTerminalFlightNumberAndOrigin(byArrivalKey: Map[ArrivalKeyWithOrigin, Int]): Map[(String, Int, String), Map[Long, Int]] =
     byArrivalKey
       .groupBy { case (key, _) =>
-        (key.terminal, key.number)
+        (key.terminal, key.number, key.origin)
       }
       .map {
-        case (((terminal, number), byArrivalKey)) =>
-          val scheduledToOffScheduled = byArrivalKey.map { case (key, offScheduled) => (key.scheduled, offScheduled) }
-          ((terminal, number), scheduledToOffScheduled)
+        case ((terminal, number, origin), byArrivalKey) =>
+          val scheduledToOffAndOrigin = byArrivalKey.map {
+            case (key, values) => (key.scheduled, values)
+          }
+          ((terminal, number, origin), scheduledToOffAndOrigin)
       }
 
   private def arrivalsWithOffScheduledForDate(terminal: Terminal, currentDay: SDate)
-                                             (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Map[ArrivalKey, Int]] = {
+                                             (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Map[ArrivalKeyWithOrigin, Int]] = {
     val actor = system.actorOf(Props(new MinutesOffScheduledActor(terminal, currentDay.fullYear, currentDay.month, currentDay.date)))
     actor
-      .ask(GetState).mapTo[Map[ArrivalKey, Int]]
+      .ask(GetState).mapTo[Map[ArrivalKeyWithOrigin, Int]]
       .map { arrivals =>
         actor ! PoisonPill
         arrivals
@@ -63,30 +66,43 @@ object MinutesOffScheduledActor {
 class MinutesOffScheduledActor(terminal: Terminal, year: Int, month: Int, day: Int) extends PersistentActor {
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-$year-$month%02d-$day%02d"
 
-  var byKey: Map[ArrivalKey, Int] = Map()
+  var byKey: Map[ArrivalKey, (Int, String)] = Map()
+  var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, Int] = Map()
 
-  def parseFlightNumber(code: String): Option[Int] = {
+  def parseCarrierAndFlightNumber(code: String): Option[(String, Int)] = {
     val flightCodeRegex: Regex = "^([A-Z0-9]{2,3}?)([0-9]{1,4})([A-Z]*)$".r
 
     code match {
-      case flightCodeRegex(_, flightNumber, _) =>
-        Try(flightNumber.toInt).toOption
+      case flightCodeRegex(carrier, flightNumber, _) =>
+        Try(flightNumber.toInt).toOption.map(n => (carrier, n))
       case _ => None
     }
   }
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
+      byKeyWithOrigin = byKey
+        .groupBy {
+          case (_, (_, origin)) => origin
+        }
+        .flatMap {
+          case (origin, arrivals) =>
+            arrivals.map {
+              case (key, (off, _)) => (ArrivalKeyWithOrigin(key.scheduled, key.terminal, key.number, origin), off)
+            }
+        }
+
     case FlightsWithSplitsDiffMessage(_, removals, updates) =>
       updates.map { u =>
         for {
           flightCode <- u.getFlight.iATA
-          flightNumber <- parseFlightNumber(flightCode)
+          (carrier, flightNumber) <- parseCarrierAndFlightNumber(flightCode)
           terminal <- u.getFlight.terminal
           scheduled <- u.getFlight.scheduled
           touchdown <- u.getFlight.touchdown
+          origin <- u.getFlight.origin
         } yield {
-          byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), (touchdown - scheduled).toInt)
+          byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), ((touchdown - scheduled).toInt, origin))
         }
       }
       removals.map { r =>
@@ -101,6 +117,6 @@ class MinutesOffScheduledActor(terminal: Terminal, year: Int, month: Int, day: I
   }
 
   override def receiveCommand: Receive = {
-    case GetState => sender() ! byKey
+    case GetState => sender() ! byKeyWithOrigin
   }
 }
