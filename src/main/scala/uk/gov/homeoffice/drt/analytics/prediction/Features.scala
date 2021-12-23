@@ -10,16 +10,23 @@ import scala.collection.immutable
 
 case class Features(featureTypes: List[FeatureType], oneToManyValues: IndexedSeq[String]) {
   def oneToManyIndices(row: Row): immutable.Seq[Int] =
-    featureTypes
-      .collect {
-        case otm: OneToMany => otm
-      }
+    oneToManyFeatures
       .map { fs =>
         val featureColValues = fs.columnNames.map(c => row.getAs[String](c))
         val featureString = s"${fs.featurePrefix}_${featureColValues.mkString("-")}"
         oneToManyValues.indexOf(featureString)
       }
       .filter(_ >= 0)
+
+  def oneToManyFeatures: immutable.Seq[OneToMany] =
+    featureTypes.collect {
+      case otm: OneToMany => otm
+    }
+
+  def singleFeatures: immutable.Seq[Single] =
+    featureTypes.collect {
+      case otm: Single => otm
+    }
 
   def oneToManyFeaturesIndices(row: Row): Array[Double] =
     Vectors.sparse(oneToManyValues.size, oneToManyIndices(row).map(idx => (idx, 1d))).toArray

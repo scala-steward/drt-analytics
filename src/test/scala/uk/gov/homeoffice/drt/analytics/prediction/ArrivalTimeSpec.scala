@@ -5,13 +5,15 @@ import akka.pattern.ask
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
+import org.apache.spark.ml.linalg.DenseVector
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor
 import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.ModelAndFeatures
+import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActor, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.OneToMany
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.T2
@@ -90,34 +92,49 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
 
                   val dataSet = DataSet(withoutOutliers, features)
                   val model: LinearRegressionModel = dataSet.trainModel("label", 80)
-//                  new LinearRegressionModel()
+
+                  println(s"coefficients: (${model.coefficients.size}): ${model.coefficients}")
+                  println(s"oneToManyValues: (${dataSet.features.oneToManyValues.size}): ${dataSet.features.oneToManyValues}")
+
                   val lrSummary = dataSet.evaluate("label", 80, model)
                   println(s"Summary: RMSE ${lrSummary.rootMeanSquaredError.round}, R2 ${lrSummary.r2}")
 
-                  val improvementPct = calculateImprovementPct(dataSet, withIndex, model)
+                  val improvementPct = calculateImprovementPct(dataSet, withIndex, model, dataSet.features)
 
-                  (improvementPct, dataSet.features)
+                  if (improvementPct >= 20)
+                    Option(terminal, number, origin, improvementPct, dataSet.features, model)
+                  else None
+              }
+              .collect {
+                case Some((terminal, number, origin, pctImprovement, features, model)) =>
+                  val actor = system.actorOf(Props(new TouchdownPredictionActor(() => SDate.now(), terminal, number, origin)))
+                  actor ! ModelAndFeatures(model, features)
               }
               .runWith(Sink.seq)
             val stats = Await.result(eventualResult, 5.minutes)
-            val goodThreshold = 20
-            val improvements = stats.filter(_._1 > goodThreshold)
-            val total = stats.size
-            val totalImprovements = improvements.size
-            println(s"Total: $total, $totalImprovements improvements >= $goodThreshold%")
+//            val goodThreshold = 20
+//            val improvements = stats.filter(_._1 > goodThreshold)
+//            val total = stats.size
+//            val totalImprovements = improvements.size
+//            println(s"Total: $total, $totalImprovements improvements >= $goodThreshold%")
     }
   }
 
-  private def calculateImprovementPct(dataSet: DataSet, withIndex: Map[(Long, Int), Int], model: LinearRegressionModel)
-                     (implicit session: SparkSession): Double = {
+  private def calculateImprovementPct(dataSet: DataSet, withIndex: Map[(Long, Int), Int], model: LinearRegressionModel, features: Features)
+                                     (implicit session: SparkSession): Double = {
     val labelsAndPreds = dataSet
-      .predict("label", 20, model)
+      .predict2("label", 20, model)
       .rdd
       .map { row =>
         val idx = row.getAs[String]("index")
         withIndex.find(_._2.toString == idx).map {
           case ((_, label), _) =>
             val prediction = Math.round(row.getAs[Double]("prediction"))
+            val featureVals = row.getAs[DenseVector]("features")
+            val manualPred = model.coefficients.toArray.zip(featureVals.toArray).map {
+              case (coeff, fval) => coeff * fval
+            }.sum + model.intercept
+            println(s"spark pred: ${prediction.toDouble} :: manual pred: $manualPred")
             (label.toDouble, prediction.toDouble)
         }.getOrElse((0d, 0d))
       }
