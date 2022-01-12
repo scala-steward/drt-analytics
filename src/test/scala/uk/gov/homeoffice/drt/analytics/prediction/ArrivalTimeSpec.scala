@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.actor.{ActorSystem, Props, Terminated}
+import akka.actor.{ActorSystem, PoisonPill, Props, Terminated}
 import akka.pattern.ask
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
@@ -12,11 +12,11 @@ import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
-import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.ModelAndFeatures
+import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.{RegressionModel, TouchdownModelAndFeatures}
 import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActor, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.OneToMany
 import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.ports.Terminals.T2
+import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -43,7 +43,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val actor = system.actorOf(Props(new MinutesOffScheduledActor(T2, 2020, 10, 1)))
             val result = Await.result(actor.ask(GetState).mapTo[Map[ArrivalKey, Int]], 1.second)
 
-            result.size should not be (0)
+            result.size should not be 0
     }
     "provide a stream of arrivals across a day range" in context {
       implicit system =>
@@ -73,22 +73,25 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
               .config("spark.master", "local")
               .getOrCreate()
 
-            val start = SDate(2020, 10, 1, 0, 0)
+            val start = SDate(2022, 1, 1, 0, 0)
             val days = 150
-            val columnNames = List("label", "dayOfTheWeek", "hhmm", "index")
-            val features = List(OneToMany(List("dayOfTheWeek"), "dow"), OneToMany(List("hhmm"), "hhmm"))
+            val columnNames = List("label", "dayOfTheWeek", "partOfDay", "index")
+            val features = List(OneToMany(List("dayOfTheWeek"), "dow"), OneToMany(List("partOfDay"), "pod"))
 
             val eventualResult = MinutesOffScheduledActor
-              .offScheduledByTerminalFlightNumberOrigin(T2, start, days)
-              .filter(_._2.size > 10)
+              .offScheduledByTerminalFlightNumberOrigin(T1, start, days)
               .map {
-                case ((terminal, number, origin), offScheduleds) =>
+                case (_, offScheduleds) if offScheduleds.size <= 5 =>
+                  println(s"Not enough examples to train on (${offScheduleds.size})")
+                  None
+                case ((terminal, number, origin), offScheduleds) if offScheduleds.size > 5 =>
                   println(s"\nNext training set")
                   val withIndex: Map[(Long, Int), Int] = addIndex(offScheduleds)
                   val dataFrame = prepareDataFrame(columnNames, withIndex)
                   val withoutOutliers = removeOutliers(dataFrame)
 
-                  println(s"Training on ${(offScheduleds.size.toDouble * 0.8).toInt} examples")
+                  val trainingExamples = (offScheduleds.size.toDouble * 0.8).toInt
+                  println(s"Training on $trainingExamples examples")
 
                   val dataSet = DataSet(withoutOutliers, features)
                   val model: LinearRegressionModel = dataSet.trainModel("label", 80)
@@ -101,22 +104,18 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
 
                   val improvementPct = calculateImprovementPct(dataSet, withIndex, model, dataSet.features)
 
-                  if (improvementPct >= 20)
-                    Option(terminal, number, origin, improvementPct, dataSet.features, model)
-                  else None
-              }
-              .collect {
-                case Some((terminal, number, origin, pctImprovement, features, model)) =>
                   val actor = system.actorOf(Props(new TouchdownPredictionActor(() => SDate.now(), terminal, number, origin)))
-                  actor ! ModelAndFeatures(model, features)
+                  val modelAndFeatures = TouchdownModelAndFeatures(RegressionModel(model), dataSet.features, trainingExamples, improvementPct.toInt)
+                  actor.ask(modelAndFeatures).map(_ => actor ! PoisonPill)
+                  Some(improvementPct)
               }
               .runWith(Sink.seq)
-            val stats = Await.result(eventualResult, 5.minutes)
-//            val goodThreshold = 20
-//            val improvements = stats.filter(_._1 > goodThreshold)
-//            val total = stats.size
-//            val totalImprovements = improvements.size
-//            println(s"Total: $total, $totalImprovements improvements >= $goodThreshold%")
+            val result = Await.result(eventualResult, 5.minutes)
+            val total = result.size
+            val modelCount = result.count(_.isDefined)
+            val threshold = 10
+            val improvements = result.collect { case Some(imp) if imp >= threshold => imp }.size
+            println(s"total: $total, models: $modelCount, $improvements >= $threshold%")
     }
   }
 
@@ -130,11 +129,6 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
         withIndex.find(_._2.toString == idx).map {
           case ((_, label), _) =>
             val prediction = Math.round(row.getAs[Double]("prediction"))
-            val featureVals = row.getAs[DenseVector]("features")
-            val manualPred = model.coefficients.toArray.zip(featureVals.toArray).map {
-              case (coeff, fval) => coeff * fval
-            }.sum + model.intercept
-            println(s"spark pred: ${prediction.toDouble} :: manual pred: $manualPred")
             (label.toDouble, prediction.toDouble)
         }.getOrElse((0d, 0d))
       }

@@ -25,7 +25,7 @@ object MinutesOffScheduledActor {
   def offScheduledByTerminalFlightNumberOrigin(terminal: Terminal, startDate: SDate, numberOfDays: Int)
                                               (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[((String, Int, String), Map[Long, Int]), NotUsed] =
     Source((0 until numberOfDays).toList)
-      .mapAsync(1)(day => arrivalsWithOffScheduledForDate(terminal, startDate.addDays(day)))
+      .mapAsync(1)(day => arrivalsWithOffScheduledForDate(terminal, startDate.addDays(-1 * day)))
       .map(byTerminalFlightNumberAndOrigin)
       .fold(Map[(String, Int, String), Map[Long, Int]]()) {
         case (acc, incoming) => addByTerminalAndFlightNumber(acc, incoming)
