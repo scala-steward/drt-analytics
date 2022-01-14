@@ -32,14 +32,6 @@ case class DataSet(df: DataFrame, featureSpecs: List[FeatureType]) {
              (implicit session: SparkSession): DataFrame =
     model
       .transform(prepare(labelCol, 100 - predictionSplitPercentage, sortAscending = false))
-      .select(col("index"), col("prediction"))
-      .sort(col("index"))
-
-  def predict2(labelCol: String, predictionSplitPercentage: Int, model: LinearRegressionModel)
-             (implicit session: SparkSession): DataFrame =
-    model
-      .transform(prepare(labelCol, 100 - predictionSplitPercentage, sortAscending = false))
-//      .select(col("index"), col("prediction"))
       .sort(col("index"))
 
   def prepare(labelColName: String, takePercentage: Int, sortAscending: Boolean)
