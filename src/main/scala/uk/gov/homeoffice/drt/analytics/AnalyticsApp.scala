@@ -34,7 +34,7 @@ object AnalyticsApp extends App {
       System.exit(0)
 
     case Some(portConfig) =>
-      println(s"Looking for job ${config.getString("options.job-name")}")
+      log.info(s"Looking for job ${config.getString("options.job-name")}")
       val eventualUpdates = config.getString("options.job-name").toLowerCase match {
         case "update-pax-counts" => PassengerCounts(portConfig, daysToLookBack)
         case "update-touchdown-models" => TouchdownTrainer(portConfig)
