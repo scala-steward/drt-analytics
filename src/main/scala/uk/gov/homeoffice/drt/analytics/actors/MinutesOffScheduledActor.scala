@@ -6,6 +6,7 @@ import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
+import org.slf4j.LoggerFactory
 import server.protobuf.messages.CrunchState.FlightsWithSplitsDiffMessage
 import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
 import uk.gov.homeoffice.drt.analytics.time.SDate
@@ -16,6 +17,8 @@ import scala.util.Try
 import scala.util.matching.Regex
 
 object MinutesOffScheduledActor {
+  private val log = LoggerFactory.getLogger(getClass)
+
   case object GetState
 
   case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
@@ -24,8 +27,12 @@ object MinutesOffScheduledActor {
 
   def offScheduledByTerminalFlightNumberOrigin(terminal: Terminal, startDate: SDate, numberOfDays: Int)
                                               (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[((String, Int, String), Map[Long, Int]), NotUsed] =
-    Source((0 until numberOfDays).toList)
-      .mapAsync(1)(day => arrivalsWithOffScheduledForDate(terminal, startDate.addDays(-1 * day)))
+    Source(((-1 * numberOfDays) until 0).toList)
+      .mapAsync(1) { day =>
+        val date = startDate.addDays(day)
+        log.info(s"Grabbing arrivals for ${date.toISODateOnly}")
+        arrivalsWithOffScheduledForDate(terminal, date)
+      }
       .map(byTerminalFlightNumberAndOrigin)
       .fold(Map[(String, Int, String), Map[Long, Int]]()) {
         case (acc, incoming) => addByTerminalAndFlightNumber(acc, incoming)

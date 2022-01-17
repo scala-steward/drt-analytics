@@ -40,6 +40,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
 
             result.size should not be 0
     }
+
     "provide a stream of arrivals across a day range" in context {
       implicit system =>
         implicit ec =>
@@ -60,14 +61,8 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
       implicit system =>
         implicit ec =>
           implicit mat =>
-            implicit val session: SparkSession = SparkSession
-              .builder
-              .appName("DRT Analytics")
-              .config("spark.master", "local")
-              .getOrCreate()
-
             val eventualResult = TouchdownTrainer.train(150, 20, T1)
-            val result = Await.result(eventualResult, 5.minutes)
+            val result: Seq[Option[Double]] = Await.result(eventualResult, 5.minutes)
             val total = result.size
             val modelCount = result.count(_.isDefined)
             val threshold = 10

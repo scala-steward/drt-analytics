@@ -1,27 +1,52 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
+import akka.Done
 import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.pattern.ask
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActor, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.{RegressionModel, TouchdownModelAndFeatures}
+import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActor, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.OneToMany
 import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.ports.Terminals
+import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.ports.{AirportConfig, Terminals}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object TouchdownTrainer {
   private val log = LoggerFactory.getLogger(getClass)
 
+  def apply(portConfig: AirportConfig)
+           (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
+    Source(portConfig.terminals.toList)
+      .mapAsync(1) { terminal =>
+        train(150, 20, terminal).map(r => logStats(terminal, r))
+      }
+      .runWith(Sink.ignore)
+
+  def logStats(terminal: Terminal, result: Seq[Option[Double]]): Unit = {
+    val total = result.size
+    val modelCount = result.count(_.isDefined)
+    val threshold = 10
+    val improvementsOverThreshold = result.collect { case Some(imp) if imp >= threshold => imp }.size
+    log.info(s"Terminal ${terminal.toString}: $total total, $modelCount models, $improvementsOverThreshold >= $threshold% improvement")
+  }
+
   def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
-           (implicit system: ActorSystem, ec: ExecutionContext, session: SparkSession, mat: Materializer, timeout: Timeout): Future[Seq[Option[Double]]] = {
+           (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Seq[Option[Double]]] = {
+
+    implicit val session: SparkSession = SparkSession
+      .builder
+      .appName("DRT Analytics")
+      .config("spark.master", "local")
+      .getOrCreate()
+
     val start = SDate.now().addDays(-1)
     val columnNames = List("label", "dayOfTheWeek", "partOfDay", "index")
     val features = List(OneToMany(List("dayOfTheWeek"), "dow"), OneToMany(List("partOfDay"), "pod"))
