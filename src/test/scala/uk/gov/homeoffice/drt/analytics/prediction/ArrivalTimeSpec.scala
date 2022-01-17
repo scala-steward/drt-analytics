@@ -5,7 +5,6 @@ import akka.pattern.ask
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
-import org.apache.spark.sql.SparkSession
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor
@@ -54,9 +53,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
 
             result.forall(_._2.nonEmpty) should be(true)
     }
-  }
 
-  "A MinutesOffScheduledActor" should {
     "provide a map of (terminal, flight-number) -> scheduled -> off-scheduled" in context {
       implicit system =>
         implicit ec =>

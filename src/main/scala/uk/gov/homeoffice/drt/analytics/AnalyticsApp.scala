@@ -1,5 +1,6 @@
 package uk.gov.homeoffice.drt.analytics
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -11,7 +12,7 @@ import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.language.postfixOps
 
 object AnalyticsApp extends App {
@@ -33,10 +34,15 @@ object AnalyticsApp extends App {
       System.exit(0)
 
     case Some(portConfig) =>
-      val eventualUpdates = config.getString("option.job-name").toLowerCase match {
+      println(s"Looking for job ${config.getString("options.job-name")}")
+      val eventualUpdates = config.getString("options.job-name").toLowerCase match {
         case "update-pax-counts" => PassengerCounts(portConfig, daysToLookBack)
         case "update-touchdown-models" => TouchdownTrainer(portConfig)
+        case unknown =>
+          log.error(s"Unknown job name '$unknown'")
+          Future.successful(Done)
       }
+
       Await.ready(eventualUpdates, 30 minutes)
       system.terminate()
       System.exit(0)
