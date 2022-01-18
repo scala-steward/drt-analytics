@@ -5,7 +5,7 @@ ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
 lazy val akkaHttpVersion = "10.1.9"
-lazy val akkaVersion = "2.5.23"
+lazy val akkaVersion = "2.6.18"
 lazy val akkaPersistenceJdbcVersion = "3.5.0"
 lazy val akkaPersistenceInMemoryVersion = "2.4.18.1"
 lazy val postgresVersion = "42.2.2"
