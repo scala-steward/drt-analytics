@@ -4,7 +4,8 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.SparkSession
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.OneToMany
+import uk.gov.homeoffice.drt.prediction.FeatureType.OneToMany
+import uk.gov.homeoffice.drt.prediction.Features
 
 class FeaturesSpec extends AnyWordSpec with Matchers {
   val context: (SparkSession => Any) => Unit = (test: SparkSession => Any) => {
@@ -21,7 +22,7 @@ class FeaturesSpec extends AnyWordSpec with Matchers {
         import session.implicits._
         val featureTypes = List(OneToMany(List("a"), "a"))
         val df = List(("1", "2"), ("1", "3"), ("2", "1"), ("2", "2")).toDF(List("a", "b"): _*)
-        val features = Features(df, featureTypes)
+        val features = DataSet(df, featureTypes).features
 
         features.oneToManyValues.toSet should ===(Set("a_1", "a_2"))
     }
@@ -33,7 +34,7 @@ class FeaturesSpec extends AnyWordSpec with Matchers {
         import session.implicits._
         val featureTypes = List(OneToMany(List("a", "b"), "ab"))
         val df = List(("1", "2"), ("1", "3"), ("2", "1"), ("2", "2")).toDF(List("a", "b"): _*)
-        val features = Features(df, featureTypes)
+        val features = DataSet(df, featureTypes).features
 
         features.oneToManyValues.toSet should ===(Set("ab_1-2", "ab_1-3", "ab_2-1", "ab_2-2"))
     }
@@ -48,7 +49,7 @@ class FeaturesSpec extends AnyWordSpec with Matchers {
 
         val row = List(("1", "2")).toDF(List("a", "b"): _*).collect().head
 
-        features.featuresVectorForRow(row) should ===(Vectors.dense(1d, 0d, 0d, 0d))
+        FeatureVectors.featuresVectorForRow(row, features) should ===(Vectors.dense(1d, 0d, 0d, 0d))
     }
 
     "return an appropriate feature vector when the values match the third feature value" in context {
@@ -59,7 +60,7 @@ class FeaturesSpec extends AnyWordSpec with Matchers {
 
         val row = List(("2", "1")).toDF(List("a", "b"): _*).collect().head
 
-        features.featuresVectorForRow(row) should ===(Vectors.dense(0d, 0d, 1d, 0d))
+        FeatureVectors.featuresVectorForRow(row, features) should ===(Vectors.dense(0d, 0d, 1d, 0d))
     }
 
     "return an appropriate feature vector for 2 one to many features" in context {
@@ -70,7 +71,7 @@ class FeaturesSpec extends AnyWordSpec with Matchers {
 
         val row = List(("2", "1", "s")).toDF(List("a", "b", "z"): _*).collect().head
 
-        features.featuresVectorForRow(row) should ===(Vectors.dense(0d, 0d, 1d, 0d, 1d, 0d))
+        FeatureVectors.featuresVectorForRow(row, features) should ===(Vectors.dense(0d, 0d, 1d, 0d, 1d, 0d))
     }
   }
 

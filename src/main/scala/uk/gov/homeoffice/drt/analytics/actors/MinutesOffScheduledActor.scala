@@ -60,7 +60,7 @@ object MinutesOffScheduledActor {
 
   private def arrivalsWithOffScheduledForDate(terminal: Terminal, currentDay: SDate)
                                              (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Map[ArrivalKeyWithOrigin, Int]] = {
-    val actor = system.actorOf(Props(new MinutesOffScheduledActor(terminal, currentDay.fullYear, currentDay.month, currentDay.date)))
+    val actor = system.actorOf(Props(new MinutesOffScheduledActor(terminal, currentDay.getFullYear, currentDay.getMonth, currentDay.getDate)))
     actor
       .ask(GetState).mapTo[Map[ArrivalKeyWithOrigin, Int]]
       .map { arrivals =>

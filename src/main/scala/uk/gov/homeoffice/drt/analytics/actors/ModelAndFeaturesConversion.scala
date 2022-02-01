@@ -1,9 +1,9 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
 import server.protobuf.messages.ModelAndFeatures.{FeaturesMessage, ModelAndFeaturesMessage, OneToManyFeatureMessage, RegressionModelMessage}
-import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.{ModelAndFeatures, RegressionModel, TouchdownModelAndFeatures}
-import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.{OneToMany, Single}
-import uk.gov.homeoffice.drt.analytics.prediction.Features
+import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.prediction.FeatureType.{OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.{Features, ModelAndFeatures, RegressionModel, TouchdownModelAndFeatures}
 
 object ModelAndFeaturesConversion {
   def modelAndFeaturesFromMessage(msg: ModelAndFeaturesMessage): ModelAndFeatures = {
@@ -13,7 +13,7 @@ object ModelAndFeaturesConversion {
     val examplesTrainedOn = msg.examplesTrainedOn.getOrElse(throw new Exception("Mandatory parameter 'examplesTrainedOn' not specified"))
     val improvementPct = msg.improvementPct.getOrElse(throw new Exception("Mandatory parameter 'improvement' not specified"))
 
-    ModelAndFeatures(model, features, targetName, examplesTrainedOn, improvementPct)
+    ModelAndFeatures(model, features, targetName, examplesTrainedOn, improvementPct, millis => SDate(millis))
   }
 
   def modelFromMessage(msg: RegressionModelMessage): RegressionModel =

@@ -1,9 +1,12 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
+import org.apache.spark.ml.linalg
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
-import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.{FeatureType, OneToMany, Single}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import uk.gov.homeoffice.drt.prediction.FeatureType.{FeatureType, OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.Features
 
 import scala.collection.immutable
 
@@ -14,7 +17,17 @@ case class DataSet(df: DataFrame, featureSpecs: List[FeatureType]) {
 
   val numRows: Long = dfIndexed.count()
 
-  val features: Features = Features(df, featureSpecs)
+  val features: Features = {
+    val oneToManyValues = featureSpecs.flatMap {
+      case _: Single => Iterable()
+      case OneToMany(columnNames, featurePrefix) =>
+        df
+          .select(concat_ws("-", columnNames.map(col): _*))
+          .rdd.distinct.collect
+          .map(r => s"${featurePrefix}_${r.getAs[String](0)}")
+    }.toIndexedSeq
+    Features(featureSpecs, oneToManyValues)
+  }
 
   lazy val lr = new LinearRegression()
 
@@ -38,7 +51,7 @@ case class DataSet(df: DataFrame, featureSpecs: List[FeatureType]) {
              (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
-    val labelAndFeatures: immutable.Seq[Column] = features.labelAndFeatureCols(df.columns, labelColName)
+    val labelAndFeatures: immutable.Seq[Column] = FeatureVectors.labelAndFeatureCols(df.columns, labelColName, features)
 
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 
@@ -51,7 +64,7 @@ case class DataSet(df: DataFrame, featureSpecs: List[FeatureType]) {
       .collect.toSeq
       .map { row =>
         val label = row.getAs[Double](0)
-        val featuresVector = features.featuresVectorForRow(row)
+        val featuresVector = FeatureVectors.featuresVectorForRow(row, features)
         val index = row.getAs[String]("index")
         (label, featuresVector, index)
       }
@@ -69,4 +82,36 @@ case class DataSet(df: DataFrame, featureSpecs: List[FeatureType]) {
           .rdd.distinct.collect
           .map(r => featurePrefix + r.getAs[String](0))
     }.toIndexedSeq
+
+
+}
+
+object FeatureVectors {
+  def featuresVectorForRow(row: Row, features: Features): linalg.Vector =
+    Vectors.dense(oneToManyFeaturesIndices(row, features) ++ singleFeaturesVector(row, features))
+
+  def oneToManyFeaturesIndices(row: Row, features: Features): Array[Double] =
+    Vectors.sparse(features.oneToManyValues.size, oneToManyIndices(row, features).map(idx => (idx, 1d))).toArray
+
+  def singleFeaturesVector(row: Row, features: Features): List[Double] = features.featureTypes.collect {
+    case Single(columnName) => row.getAs[Double](columnName)
+  }
+
+  def oneToManyIndices(row: Row, features: Features): Seq[Int] =
+    features.oneToManyFeatures
+      .map { fs =>
+        val featureColValues = fs.columnNames.map(c => row.getAs[String](c))
+        val featureString = s"${fs.featurePrefix}_${featureColValues.mkString("-")}"
+        features.oneToManyValues.indexOf(featureString)
+      }
+      .filter(_ >= 0)
+
+  def labelAndFeatureCols(allColumns: Iterable[String], labelColName: String, features: Features)
+                         (implicit session: SparkSession): immutable.Seq[Column] = {
+    val featureColumns = features.featureTypes.map {
+      case OneToMany(columnNames, _) => concat_ws("-", columnNames.map(col): _*)
+      case Single(columnName) => col(columnName)
+    }
+    col(labelColName) :: (featureColumns ++ allColumns.map(col))
+  }
 }

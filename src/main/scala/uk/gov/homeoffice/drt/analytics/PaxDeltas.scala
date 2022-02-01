@@ -87,7 +87,7 @@ object PaxDeltas {
     "Date,Terminal,Origin," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
 
   def startDate(numDays: Int): SDate = {
-    val today = SDate(localNow.fullYear, localNow.month, localNow.date, 0, 0)
+    val today = SDate(localNow.getFullYear, localNow.getMonth, localNow.getDate, 0, 0)
     today.addDays(-1 * (numDays - 1))
   }
 

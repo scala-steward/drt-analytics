@@ -10,12 +10,13 @@ import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.{RegressionModel, TouchdownModelAndFeatures}
+import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.RegressionModelFromSpark
 import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActor, TouchdownPredictionActor}
-import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.OneToMany
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, Terminals}
+import uk.gov.homeoffice.drt.prediction.FeatureType.OneToMany
+import uk.gov.homeoffice.drt.prediction.TouchdownModelAndFeatures
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -69,7 +70,7 @@ object TouchdownTrainer {
 
           val improvementPct = calculateImprovementPct(dataSet, withIndex, model, validationSetPct)
 
-          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModel(model), dataSet.features, trainingExamples, improvementPct.toInt)
+          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModelFromSpark(model), dataSet.features, trainingExamples, improvementPct.toInt, millis => SDate(millis))
 
           val actor = system.actorOf(Props(new TouchdownPredictionActor(() => SDate.now(), terminal, number, origin)))
           actor.ask(modelAndFeatures).map(_ => actor ! PoisonPill)
@@ -112,8 +113,8 @@ object TouchdownTrainer {
     offScheduledsWithIndex
       .map {
         case ((scheduled, offScheduled), idx) =>
-          val mornAft = s"${SDate(scheduled).hours / 12}"
-          (offScheduled.toDouble, SDate(scheduled).dayOfWeek.toString, mornAft, idx.toString)
+          val mornAft = s"${SDate(scheduled).getHours / 12}"
+          (offScheduled.toDouble, SDate(scheduled).getDayOfWeek.toString, mornAft, idx.toString)
       }
       .toList.toDF(columnNames: _*)
       .sort("label")

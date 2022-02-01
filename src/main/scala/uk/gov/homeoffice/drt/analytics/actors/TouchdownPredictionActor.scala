@@ -4,48 +4,12 @@ import org.apache.spark.ml.regression.LinearRegressionModel
 import org.slf4j.{Logger, LoggerFactory}
 import scalapb.GeneratedMessage
 import server.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
-import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.ModelAndFeatures
-import uk.gov.homeoffice.drt.analytics.prediction.Features
 import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.prediction.{ModelAndFeatures, RegressionModel}
 
 object TouchdownPredictionActor {
-  case class RegressionModel(coefficients: Iterable[Double], intercept: Double)
-
-  object RegressionModel {
+  object RegressionModelFromSpark {
     def apply(lrModel: LinearRegressionModel): RegressionModel = RegressionModel(lrModel.coefficients.toArray, lrModel.intercept)
-  }
-
-  trait ModelAndFeatures {
-    val model: RegressionModel
-    val features: Features
-    val examplesTrainedOn: Int
-    val improvementPct: Int
-  }
-
-  object ModelAndFeatures {
-    def apply(model: RegressionModel, features: Features, targetName: String, examplesTrainedOn: Int, improvement: Int): ModelAndFeatures = targetName match {
-      case TouchdownModelAndFeatures.targetName => TouchdownModelAndFeatures(model, features, examplesTrainedOn, improvement)
-    }
-  }
-
-  object TouchdownModelAndFeatures {
-    val targetName: String = "touchdown"
-  }
-
-  case class TouchdownModelAndFeatures(model: RegressionModel, features: Features, examplesTrainedOn: Int, improvementPct: Int) extends ModelAndFeatures {
-    //    def maybePrediction(arrival: Arrival): Option[Long] = {
-    //      val dow = s"dow_${SDate(arrival.scheduled).getDayOfWeek()}"
-    //      val hhmm = s"hhmm_${SDate(arrival.scheduled).getHours() / 12}"
-    //      val dowIdx = features.oneToManyValues.indexOf(dow)
-    //      val hhmmIdx = features.oneToManyValues.indexOf(hhmm)
-    //      for {
-    //        dowCo <- model.coefficients.toIndexedSeq.lift(dowIdx)
-    //        hhmmCo <- model.coefficients.toIndexedSeq.lift(hhmmIdx)
-    //      } yield {
-    //        val offScheduled = (model.intercept + dowCo + hhmmCo).toInt
-    //        arrival.Scheduled + (offScheduled * MilliTimes.oneMinuteMillis)
-    //      }
-    //    }
   }
 }
 

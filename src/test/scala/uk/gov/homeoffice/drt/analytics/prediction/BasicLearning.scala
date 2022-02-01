@@ -3,7 +3,7 @@ package uk.gov.homeoffice.drt.analytics.prediction
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.analytics.prediction.FeatureType.{FeatureType, OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.FeatureType.{FeatureType, OneToMany, Single}
 
 class BasicLearning extends AnyWordSpec with Matchers {
   implicit val session: SparkSession = SparkSession
