@@ -7,14 +7,18 @@ import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduled, MinutesOffScheduledActor, MinutesOffScheduledActorImpl}
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
+
+class MinutesOffScheduledMock extends MinutesOffScheduledActorImpl(T2, 2020, 10, 1) {
+  byKey = Map(ArrivalKey(0L, "T2", 1) -> (2, "MMM"))
+}
 
 class ArrivalTimeSpec extends AnyWordSpec with Matchers {
   implicit val timeout: Timeout = new Timeout(5.second)
@@ -29,12 +33,12 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
     system.terminate()
   }
 
-  "A MinutesOffScheduledActor" ignore {
+  "A MinutesOffScheduledActor" should {
     "recover some state" in context {
       implicit system =>
         implicit ec =>
           implicit mat =>
-            val actor = system.actorOf(Props(new MinutesOffScheduledActor(T2, 2020, 10, 1)))
+            val actor = system.actorOf(Props(new MinutesOffScheduledMock))
             val result = Await.result(actor.ask(GetState).mapTo[Map[ArrivalKey, Int]], 1.second)
 
             result.size should not be 0
@@ -47,7 +51,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val start = SDate(2020, 10, 1, 0, 0)
             val days = 10
 
-            val arrivals = MinutesOffScheduledActor.offScheduledByTerminalFlightNumberOrigin(T2, start, days)
+            val arrivals = MinutesOffScheduled(classOf[MinutesOffScheduledActorImpl]).offScheduledByTerminalFlightNumberOrigin(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)
 

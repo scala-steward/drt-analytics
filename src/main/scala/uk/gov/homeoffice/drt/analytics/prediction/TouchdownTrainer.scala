@@ -11,7 +11,7 @@ import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.RegressionModelFromSpark
-import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActor, TouchdownPredictionActor}
+import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduled, MinutesOffScheduledActor, MinutesOffScheduledActorImpl, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, Terminals}
@@ -54,7 +54,7 @@ object TouchdownTrainer {
 
     val trainingSetPct = 100 - validationSetPct
 
-    MinutesOffScheduledActor
+    MinutesOffScheduled(classOf[MinutesOffScheduledActorImpl])
       .offScheduledByTerminalFlightNumberOrigin(terminal, start, daysOfData)
       .map {
         case (_, offScheduleExamples) if offScheduleExamples.size <= 5 => None

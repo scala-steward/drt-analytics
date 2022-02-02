@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
 import akka.NotUsed
-import akka.actor.{ActorSystem, PoisonPill, Props}
+import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
 import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import akka.stream.scaladsl.Source
@@ -17,14 +17,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.util.matching.Regex
 
-object MinutesOffScheduledActor {
+case class MinutesOffScheduled[T <: MinutesOffScheduledActor](actorClass: Class[T]) {
+
   private val log = LoggerFactory.getLogger(getClass)
-
-  case object GetState
-
-  case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
-
-  case class ArrivalKeyWithOrigin(scheduled: Long, terminal: String, number: Int, origin: String)
 
   def offScheduledByTerminalFlightNumberOrigin(terminal: Terminal, startDate: SDate, numberOfDays: Int)
                                               (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[((String, Int, String), Map[Long, Int]), NotUsed] =
@@ -60,7 +55,7 @@ object MinutesOffScheduledActor {
 
   private def arrivalsWithOffScheduledForDate(terminal: Terminal, currentDay: SDate)
                                              (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Map[ArrivalKeyWithOrigin, Int]] = {
-    val actor = system.actorOf(Props(new MinutesOffScheduledActor(terminal, currentDay.getFullYear, currentDay.getMonth, currentDay.getDate)))
+    val actor = system.actorOf(Props(actorClass, terminal, currentDay.getFullYear, currentDay.getMonth, currentDay.getDate))
     actor
       .ask(GetState).mapTo[Map[ArrivalKeyWithOrigin, Int]]
       .map { arrivals =>
@@ -71,8 +66,22 @@ object MinutesOffScheduledActor {
   }
 }
 
+object MinutesOffScheduledActor {
+  case object GetState
 
-class MinutesOffScheduledActor(terminal: Terminal, year: Int, month: Int, day: Int) extends PersistentActor {
+  case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
+
+  case class ArrivalKeyWithOrigin(scheduled: Long, terminal: String, number: Int, origin: String)
+}
+
+trait MinutesOffScheduledActor extends Actor {
+  val terminal: Terminal
+  val year: Int
+  val month: Int
+  val day: Int
+}
+
+class MinutesOffScheduledActorImpl(val terminal: Terminal, val year: Int, val month: Int, val day: Int) extends MinutesOffScheduledActor with PersistentActor {
   private val log = LoggerFactory.getLogger(getClass)
 
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-$year-$month%02d-$day%02d"
