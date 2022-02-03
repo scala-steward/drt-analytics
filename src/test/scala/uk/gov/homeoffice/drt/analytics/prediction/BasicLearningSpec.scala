@@ -4,9 +4,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.prediction.FeatureType.{FeatureType, OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.Feature.{Feature, OneToMany, Single}
 
-class BasicLearning extends AnyWordSpec with Matchers with BeforeAndAfterAll {
+class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession
     .builder
     .appName("DRT Analytics")
@@ -49,7 +49,7 @@ class BasicLearning extends AnyWordSpec with Matchers with BeforeAndAfterAll {
     }
   }
 
-  private def trainAndPredict(data: DataFrame, featureSpecs: List[FeatureType]): Map[String, Double] = {
+  private def trainAndPredict(data: DataFrame, featureSpecs: List[Feature]): Map[String, Double] = {
     val dataSet = DataSet(data, featureSpecs)
 
     val model = dataSet.trainModel("target", 50)

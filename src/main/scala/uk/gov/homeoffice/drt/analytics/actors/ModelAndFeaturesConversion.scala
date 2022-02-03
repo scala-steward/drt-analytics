@@ -1,9 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
 import server.protobuf.messages.ModelAndFeatures.{FeaturesMessage, ModelAndFeaturesMessage, OneToManyFeatureMessage, RegressionModelMessage}
-import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.prediction.FeatureType.{OneToMany, Single}
-import uk.gov.homeoffice.drt.prediction.{Features, ModelAndFeatures, RegressionModel, TouchdownModelAndFeatures}
+import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.{FeaturesWithOneToManyValues, ModelAndFeatures, RegressionModel, TouchdownModelAndFeatures}
 
 object ModelAndFeaturesConversion {
   def modelAndFeaturesFromMessage(msg: ModelAndFeaturesMessage): ModelAndFeatures = {
@@ -13,18 +12,18 @@ object ModelAndFeaturesConversion {
     val examplesTrainedOn = msg.examplesTrainedOn.getOrElse(throw new Exception("Mandatory parameter 'examplesTrainedOn' not specified"))
     val improvementPct = msg.improvementPct.getOrElse(throw new Exception("Mandatory parameter 'improvement' not specified"))
 
-    ModelAndFeatures(model, features, targetName, examplesTrainedOn, improvementPct, millis => SDate(millis))
+    ModelAndFeatures(model, features, targetName, examplesTrainedOn, improvementPct)
   }
 
   def modelFromMessage(msg: RegressionModelMessage): RegressionModel =
     RegressionModel(msg.coefficients, msg.intercept.getOrElse(throw new Exception("No value for intercept")))
 
-  def featuresFromMessage(msg: FeaturesMessage): Features = {
+  def featuresFromMessage(msg: FeaturesMessage): FeaturesWithOneToManyValues = {
     val singles = msg.singleFeatures.map(Single)
     val oneToManys = msg.oneToManyFeatures.map(oneToManyFromMessage)
     val allFeatures = oneToManys ++ singles
 
-    Features(allFeatures.toList, msg.oneToManyValues.toIndexedSeq)
+    FeaturesWithOneToManyValues(allFeatures.toList, msg.oneToManyValues.toIndexedSeq)
   }
 
   def oneToManyFromMessage(msg: OneToManyFeatureMessage): OneToMany =
@@ -36,13 +35,13 @@ object ModelAndFeaturesConversion {
       intercept = Option(model.intercept),
     )
 
-  def featuresToMessage(features: Features): FeaturesMessage = {
+  def featuresToMessage(features: FeaturesWithOneToManyValues): FeaturesMessage = {
     FeaturesMessage(
-      oneToManyFeatures = features.featureTypes.collect {
+      oneToManyFeatures = features.features.collect {
         case OneToMany(columnNames, featurePrefix) =>
           OneToManyFeatureMessage(columnNames, Option(featurePrefix))
       },
-      singleFeatures = features.featureTypes.collect {
+      singleFeatures = features.features.collect {
         case Single(columnName) => columnName
       },
       oneToManyValues = features.oneToManyValues

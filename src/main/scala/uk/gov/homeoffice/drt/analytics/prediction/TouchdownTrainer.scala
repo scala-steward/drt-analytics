@@ -16,7 +16,7 @@ import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActorImpl, Tou
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, Terminals}
-import uk.gov.homeoffice.drt.prediction.FeatureType.OneToMany
+import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
 import uk.gov.homeoffice.drt.prediction.TouchdownModelAndFeatures
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -71,7 +71,7 @@ object TouchdownTrainer {
 
           val improvementPct = calculateImprovementPct(dataSet, withIndex, model, validationSetPct)
 
-          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModelFromSpark(model), dataSet.features, trainingExamples, improvementPct.toInt, millis => SDate(millis))
+          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModelFromSpark(model), dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct.toInt)
 
           val actor = system.actorOf(Props(new TouchdownPredictionActor(() => SDate.now(), terminal, number, origin)))
           actor.ask(modelAndFeatures).map(_ => actor ! PoisonPill)
