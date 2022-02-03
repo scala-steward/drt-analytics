@@ -7,8 +7,8 @@ import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduled, MinutesOffScheduledActor, MinutesOffScheduledActorImpl}
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActorImpl
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
 
@@ -26,7 +26,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
   val context: (ActorSystem => ExecutionContext => Materializer => Any) => Future[Terminated] = (test: ActorSystem => ExecutionContext => Materializer => Any) => {
     implicit val system: ActorSystem = ActorSystem("test")
     implicit val ec: ExecutionContextExecutor = system.dispatcher
-    implicit val mat: ActorMaterializer = ActorMaterializer.create(system)
+    implicit val mat: Materializer = Materializer(system)
 
     test(system)(ec)(mat)
 

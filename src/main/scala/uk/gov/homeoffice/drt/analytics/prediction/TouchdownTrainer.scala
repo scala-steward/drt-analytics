@@ -10,8 +10,9 @@ import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.FlightRoute
 import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.RegressionModelFromSpark
-import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduled, MinutesOffScheduledActor, MinutesOffScheduledActorImpl, TouchdownPredictionActor}
+import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActorImpl, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, Terminals}
@@ -58,7 +59,7 @@ object TouchdownTrainer {
       .offScheduledByTerminalFlightNumberOrigin(terminal, start, daysOfData)
       .map {
         case (_, offScheduleExamples) if offScheduleExamples.size <= 5 => None
-        case ((terminal, number, origin), offScheduleExamples) =>
+        case (FlightRoute(terminal, number, origin), offScheduleExamples) =>
           val withIndex: Map[(Long, Int), Int] = addIndex(offScheduleExamples)
           val dataFrame = prepareDataFrame(columnNames, withIndex)
           val withoutOutliers = removeOutliers(dataFrame)

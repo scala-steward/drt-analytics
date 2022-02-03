@@ -2,7 +2,6 @@ package uk.gov.homeoffice.drt.analytics.services
 
 import akka.Done
 import akka.actor.{ActorSystem, Props}
-import akka.pattern.AskableActorRef
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
@@ -20,7 +19,7 @@ object PassengerCounts {
 
   def apply(config: AirportConfig, daysToLookBack: Int)
            (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] = {
-    val passengersActor: AskableActorRef = system.actorOf(Props(new PassengersActor(() => SDate.now(), 30)))
+    val passengersActor = system.actorOf(Props(new PassengersActor(() => SDate.now(), 30)))
     Source(config.terminals.toList)
       .flatMapConcat { terminal =>
         PaxDeltas.updateDailyPassengersByOriginAndDay(terminal.toString.toUpperCase, PaxDeltas.startDate(daysToLookBack), daysToLookBack - 1, passengersActor)

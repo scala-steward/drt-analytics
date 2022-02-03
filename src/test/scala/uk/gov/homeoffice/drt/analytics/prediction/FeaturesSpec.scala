@@ -75,11 +75,10 @@ class FeaturesSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  private def newSparkSession = {
+  private def newSparkSession =
     SparkSession
       .builder
       .appName("DRT Analytics")
       .config("spark.master", "local")
       .getOrCreate()
-  }
 }

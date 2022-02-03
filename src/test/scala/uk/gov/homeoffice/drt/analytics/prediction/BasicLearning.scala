@@ -1,11 +1,12 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.prediction.FeatureType.{FeatureType, OneToMany, Single}
 
-class BasicLearning extends AnyWordSpec with Matchers {
+class BasicLearning extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession
     .builder
     .appName("DRT Analytics")
@@ -13,6 +14,8 @@ class BasicLearning extends AnyWordSpec with Matchers {
     .getOrCreate()
 
   import session.implicits._
+
+  override def afterAll(): Unit = session.close()
 
   "A Dataset" ignore {
     "be able to train a single variate model and predict values accurately" in {

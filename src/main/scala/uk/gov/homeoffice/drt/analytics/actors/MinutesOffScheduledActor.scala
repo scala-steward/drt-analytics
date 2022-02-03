@@ -9,76 +9,31 @@ import akka.util.Timeout
 import org.slf4j.LoggerFactory
 import server.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import server.protobuf.messages.FlightsMessage.UniqueArrivalMessage
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
+import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, FlightRoute, GetState}
 import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.util.matching.Regex
 
-case class MinutesOffScheduled[T <: MinutesOffScheduledActor](actorClass: Class[T]) {
-
-  private val log = LoggerFactory.getLogger(getClass)
-
-  def offScheduledByTerminalFlightNumberOrigin(terminal: Terminal, startDate: SDate, numberOfDays: Int)
-                                              (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Source[((String, Int, String), Map[Long, Int]), NotUsed] =
-    Source(((-1 * numberOfDays) until 0).toList)
-      .mapAsync(1) { day =>
-        val date = startDate.addDays(day)
-        log.info(s"Grabbing arrivals for ${date.toISODateOnly}")
-        arrivalsWithOffScheduledForDate(terminal, date)
-      }
-      .map(byTerminalFlightNumberAndOrigin)
-      .fold(Map[(String, Int, String), Map[Long, Int]]()) {
-        case (acc, incoming) => addByTerminalAndFlightNumber(acc, incoming)
-      }
-      .mapConcat(identity)
-
-  private def addByTerminalAndFlightNumber(acc: Map[(String, Int, String), Map[Long, Int]], incoming: Map[(String, Int, String), Map[Long, Int]]): Map[(String, Int, String), Map[Long, Int]] =
-    incoming.foldLeft(acc) {
-      case (acc, (key, arrivals)) => acc.updated(key, acc.getOrElse(key, Map()) ++ arrivals)
-    }
-
-  private def byTerminalFlightNumberAndOrigin(byArrivalKey: Map[ArrivalKeyWithOrigin, Int]): Map[(String, Int, String), Map[Long, Int]] =
-    byArrivalKey
-      .groupBy { case (key, _) =>
-        (key.terminal, key.number, key.origin)
-      }
-      .map {
-        case ((terminal, number, origin), byArrivalKey) =>
-          val scheduledToOffAndOrigin = byArrivalKey.map {
-            case (key, values) => (key.scheduled, values)
-          }
-          ((terminal, number, origin), scheduledToOffAndOrigin)
-      }
-
-  private def arrivalsWithOffScheduledForDate(terminal: Terminal, currentDay: SDate)
-                                             (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Map[ArrivalKeyWithOrigin, Int]] = {
-    val actor = system.actorOf(Props(actorClass, terminal, currentDay.getFullYear, currentDay.getMonth, currentDay.getDate))
-    actor
-      .ask(GetState).mapTo[Map[ArrivalKeyWithOrigin, Int]]
-      .map { arrivals =>
-        log.info(s"Got data for $terminal / ${currentDay.toISODateOnly}")
-        actor ! PoisonPill
-        arrivals
-      }
-  }
-}
-
-object MinutesOffScheduledActor {
-  case object GetState
-
-  case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
-
-  case class ArrivalKeyWithOrigin(scheduled: Long, terminal: String, number: Int, origin: String)
-}
 
 trait MinutesOffScheduledActor extends Actor {
   val terminal: Terminal
   val year: Int
   val month: Int
   val day: Int
+}
+
+object MinutesOffScheduledActor {
+  case object GetState
+
+  case class FlightRoute(terminal: String, number: Int, origin: String)
+
+  case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
+
+  case class ArrivalKeyWithOrigin(scheduled: Long, terminal: String, number: Int, origin: String)
 }
 
 class MinutesOffScheduledActorImpl(val terminal: Terminal, val year: Int, val month: Int, val day: Int) extends MinutesOffScheduledActor with PersistentActor {
@@ -90,10 +45,8 @@ class MinutesOffScheduledActorImpl(val terminal: Terminal, val year: Int, val mo
   var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, Int] = Map()
 
   def parseCarrierAndFlightNumber(code: String): Option[(String, Int)] = {
-    val flightCodeRegex: Regex = "^([A-Z0-9]{2,3}?)([0-9]{1,4})([A-Z]*)$".r
-
     code match {
-      case flightCodeRegex(carrier, flightNumber, _) =>
+      case Arrival.flightCodeRegex(carrier, flightNumber, _) =>
         Try(flightNumber.toInt).toOption.map(n => (carrier, n))
       case _ => None
     }

@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics
 
 import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.pattern.AskableActorRef
+import akka.actor.{ActorRef, ActorSystem}
+import akka.pattern.ask
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.joda.time.DateTimeZone
@@ -45,7 +45,7 @@ object PaxDeltas {
   def updateDailyPassengersByOriginAndDay(terminal: String,
                                           startDate: SDate,
                                           numberOfDays: Int,
-                                          passengersActor: AskableActorRef)
+                                          passengersActor: ActorRef)
                                          (implicit timeout: Timeout,
                                           ec: ExecutionContext,
                                           system: ActorSystem): Source[Option[(String, SDate)], NotUsed] =
