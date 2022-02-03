@@ -4,7 +4,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.prediction.Feature.{Feature, OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.Feature
+import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
 
 class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession

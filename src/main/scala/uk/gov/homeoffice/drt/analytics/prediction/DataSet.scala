@@ -3,8 +3,8 @@ package uk.gov.homeoffice.drt.analytics.prediction
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
-import uk.gov.homeoffice.drt.prediction.Feature.{Feature, OneToMany, Single}
-import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
+import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.{Feature, FeaturesWithOneToManyValues}
 
 import scala.collection.immutable
 
@@ -40,7 +40,7 @@ case class DataSet(df: DataFrame, features: List[Feature]) {
       .transform(prepareDataFrame(labelCol, 100 - predictionSplitPercentage, sortAscending = false))
       .sort(col("index"))
 
-  def prepareDataFrame(labelColName: String, takePercentage: Int, sortAscending: Boolean)
+  private def prepareDataFrame(labelColName: String, takePercentage: Int, sortAscending: Boolean)
                       (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 

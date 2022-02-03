@@ -4,8 +4,8 @@ import org.apache.spark.ml.linalg
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.{col, concat_ws}
 import org.apache.spark.sql.{Column, Row, SparkSession}
-import uk.gov.homeoffice.drt.prediction.Feature.{Feature, OneToMany, Single}
-import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
+import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.{Feature, FeaturesWithOneToManyValues}
 
 import scala.collection.immutable
 

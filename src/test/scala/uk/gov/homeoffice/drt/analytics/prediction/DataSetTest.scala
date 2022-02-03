@@ -41,5 +41,9 @@ class DataSetTest extends Specification with AfterAll {
     "It should provide all the one to many features" >> {
       dataSet.oneToManyFeatureValues.toSet === Set("a_2.0-3d", "a_2.0-4d", "a_1.0-2d", "a_1.0-1d")
     }
+
+    "It should have a row count matching the number of rows" >> {
+      dataSet.numRows === 4
+    }
   }
 }
