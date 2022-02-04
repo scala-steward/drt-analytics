@@ -55,6 +55,8 @@ lazy val root = (project in file("."))
     resolvers += "Artifactory Realm release local" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
 
+    Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
+
   )
   .enablePlugins(DockerPlugin)
   .enablePlugins(AshScriptPlugin)

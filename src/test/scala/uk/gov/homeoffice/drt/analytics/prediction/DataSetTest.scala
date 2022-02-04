@@ -1,8 +1,9 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.specs2.mutable.Specification
-import org.specs2.specification.AfterAll
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
 
 object MockData {
@@ -20,10 +21,9 @@ object MockData {
   }
 }
 
-class DataSetTest extends Specification with AfterAll {
+class DataSetTest extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession
     .builder
-    .appName("DRT Analytics")
     .config("spark.master", "local")
     .getOrCreate()
 
@@ -31,18 +31,18 @@ class DataSetTest extends Specification with AfterAll {
 
   val df: DataFrame = MockData.data
 
-  "Given a small DataSet" >> {
+  "A small DataSet" should {
     val dataSet = DataSet(df, List(Single("p1"), OneToMany(List("p1", "p2"), "a")))
 
-    "It should provide an indexed version with an incrementing number" >> {
+    "Provide an indexed version with an incrementing number" in {
       dataSet.dfIndexed.select("_index").collect().map(_(0)) === Array(0, 1, 2, 3)
     }
 
-    "It should provide all the one to many features" >> {
+    "Provide all the one to many features" in {
       dataSet.oneToManyFeatureValues.toSet === Set("a_2.0-3d", "a_2.0-4d", "a_1.0-2d", "a_1.0-1d")
     }
 
-    "It should have a row count matching the number of rows" >> {
+    "Have a row count matching the number of rows" in {
       dataSet.numRows === 4
     }
   }

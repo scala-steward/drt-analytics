@@ -10,7 +10,6 @@ import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
 class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession
     .builder
-    .appName("DRT Analytics")
     .config("spark.master", "local")
     .getOrCreate()
 
