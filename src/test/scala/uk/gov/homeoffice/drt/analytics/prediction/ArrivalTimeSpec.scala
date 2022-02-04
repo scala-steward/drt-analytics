@@ -57,18 +57,5 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
 
             result.forall(_._2.nonEmpty) should be(true)
     }
-
-    "provide a map of (terminal, flight-number) -> scheduled -> off-scheduled" in context {
-      implicit system =>
-        implicit ec =>
-          implicit mat =>
-            val eventualResult = TouchdownTrainer.train(150, 20, T1)
-            val result: Seq[Option[Double]] = Await.result(eventualResult, 5.minutes)
-            val total = result.size
-            val modelCount = result.count(_.isDefined)
-            val threshold = 10
-            val improvements = result.collect { case Some(imp) if imp >= threshold => imp }.size
-            println(s"total: $total, models: $modelCount, $improvements >= $threshold%")
-    }
   }
 }
