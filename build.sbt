@@ -13,7 +13,7 @@ lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.12.0"
 lazy val specs2Version = "4.6.0"
-lazy val drtLib = "v148"
+lazy val drtLib = "v149"
 lazy val sparkVersion = "3.2.0"
 lazy val scalaTestVersion = "3.2.9"
 
