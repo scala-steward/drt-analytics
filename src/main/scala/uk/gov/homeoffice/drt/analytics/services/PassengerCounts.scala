@@ -17,8 +17,8 @@ import scala.concurrent.{ExecutionContext, Future}
 object PassengerCounts {
   private val log = LoggerFactory.getLogger(getClass)
 
-  def apply(config: AirportConfig, daysToLookBack: Int)
-           (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] = {
+  def updateForPort(config: AirportConfig, daysToLookBack: Int)
+                   (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] = {
     val passengersActor = system.actorOf(Props(new PassengersActor(() => SDate.now(), 30)))
     Source(config.terminals.toList)
       .flatMapConcat { terminal =>

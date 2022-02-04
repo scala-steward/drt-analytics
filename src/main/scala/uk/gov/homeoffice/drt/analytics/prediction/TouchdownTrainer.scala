@@ -24,8 +24,8 @@ import scala.concurrent.{ExecutionContext, Future}
 object TouchdownTrainer {
   private val log = LoggerFactory.getLogger(getClass)
 
-  def apply(portConfig: AirportConfig)
-           (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
+  def trainForPort(portConfig: AirportConfig)
+                  (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
     Source(portConfig.terminals.toList)
       .mapAsync(1) { terminal =>
         train(150, 20, terminal).map(r => logStats(terminal, r))

@@ -36,8 +36,8 @@ object AnalyticsApp extends App {
     case Some(portConfig) =>
       log.info(s"Looking for job ${config.getString("options.job-name")}")
       val eventualUpdates = config.getString("options.job-name").toLowerCase match {
-        case "update-pax-counts" => PassengerCounts(portConfig, daysToLookBack)
-        case "update-touchdown-models" => TouchdownTrainer(portConfig)
+        case "update-pax-counts" => PassengerCounts.updateForPort(portConfig, daysToLookBack)
+        case "update-touchdown-models" => TouchdownTrainer.trainForPort(portConfig)
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
           Future.successful(Done)
