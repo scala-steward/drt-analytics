@@ -1,13 +1,13 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.pattern.AskableActorRef
+import akka.pattern.ask
 import akka.persistence.SaveSnapshotSuccess
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import org.specs2.mutable.SpecificationLike
-import org.specs2.specification.{AfterAll, AfterEach, BeforeEach}
+import org.specs2.specification.{AfterAll, BeforeEach}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.analytics.{DailyPaxCountsOnDay, OriginTerminalDailyPaxCountsOnDay}
 
@@ -41,7 +41,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
     TestKit.shutdownActorSystem(system)
   }
 
-  implicit val timeout: Timeout = new Timeout(5 second)
+  implicit val timeout: Timeout = new Timeout(5.second)
 
   val origin = "JFK"
   val terminal = "T1"
@@ -53,19 +53,19 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
   "Given a PassengersActor" >> {
     "When I send it some counts for an origin and terminal and then ask for the counts" >> {
       "Then I should get back the counts I sent it" >> {
-        val actor: AskableActorRef = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
+        val actor = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
         val eventualCounts = actor.ask(otDailyPax).flatMap { _ =>
           actor.ask(OriginAndTerminal(origin, terminal)).asInstanceOf[Future[Option[Map[(Long, Long), Int]]]]
         }
 
-        val result = Await.result(eventualCounts, 5 second)
+        val result = Await.result(eventualCounts, 5.second)
         result === Option(Map((date20200301.millisSinceEpoch, date20200301.millisSinceEpoch) -> 100))
       }
     }
 
     "When I send it a counts for an origin and terminal, for 2 points in time separately, and then ask for the counts" >> {
       "Then I should get back the combined counts I sent it" >> {
-        val actor: AskableActorRef = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
+        val actor = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
         val dailyPax2 = DailyPaxCountsOnDay(date20200301.addDays(1).millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
         val otDailyPax2 = OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPax2)
         val eventualCounts = actor.ask(otDailyPax).flatMap { _ =>
@@ -74,7 +74,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
           }
         }
 
-        val result = Await.result(eventualCounts, 5 second)
+        val result = Await.result(eventualCounts, 5.second)
         result === Option(Map(
           (date20200301.millisSinceEpoch, date20200301.millisSinceEpoch) -> 100,
           (date20200301.addDays(1).millisSinceEpoch, date20200301.millisSinceEpoch) -> 100))
@@ -83,7 +83,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
 
     "When I send it a counts for one origin and terminal, followed by a different origin & terminal, and then ask for the counts for the first" >> {
       "Then I should get back the counts I sent for the first origin and terminal" >> {
-        val actor: AskableActorRef = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
+        val actor = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
         val dailyPax2 = DailyPaxCountsOnDay(date20200301.addDays(1).millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
         val origin2 = "BHX"
         val otDailyPax2 = OriginTerminalDailyPaxCountsOnDay(origin2, terminal, dailyPax2)
@@ -93,7 +93,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
           }
         }
 
-        val result = Await.result(eventualCounts, 5 second)
+        val result = Await.result(eventualCounts, 5.second)
         result === Option(Map((date20200301.millisSinceEpoch, date20200301.millisSinceEpoch) -> 100))
       }
     }

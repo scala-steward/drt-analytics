@@ -6,7 +6,7 @@ import akka.testkit.TestKit
 import org.specs2.mutable.SpecificationLike
 import uk.gov.homeoffice.drt.analytics.actors.{FeedPersistenceIds, GetArrivals}
 import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, DailyPaxCountsOnDay}
+import uk.gov.homeoffice.drt.analytics.{SimpleArrival, Arrivals, DailyPaxCountsOnDay}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -28,8 +28,8 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
   val livePid: String = FeedPersistenceIds.live
   val forecastPid: String = FeedPersistenceIds.forecastBase
   val date: SDate = SDate("2020-01-01")
-  val forecastArrival: Arrival = Arrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched", 100, 0)
-  val liveArrival: Arrival = Arrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched", 50, 0)
+  val forecastArrival: SimpleArrival = SimpleArrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched", 100, 0)
+  val liveArrival: SimpleArrival = SimpleArrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched", 50, 0)
 
   "Given a sourcePersistenceId, and props for a mock actor with an arrival" >> {
     val props = MockArrivalsActor.props
@@ -111,5 +111,5 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
     }
   }
 
-  private def genArrivals(arrivals: Seq[Arrival]): Arrivals = Arrivals(arrivals.map(a => (a.uniqueArrival, a)).toMap)
+  private def genArrivals(arrivals: Seq[SimpleArrival]): Arrivals = Arrivals(arrivals.map(a => (a.uniqueArrival, a)).toMap)
 }

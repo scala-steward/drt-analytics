@@ -1,13 +1,13 @@
 package uk.gov.homeoffice.drt.analytics.messages
 
 import server.protobuf.messages.FlightsMessage.FlightMessage
-import uk.gov.homeoffice.drt.analytics.Arrival
+import uk.gov.homeoffice.drt.analytics.SimpleArrival
 
 import scala.util.matching.Regex
 
 object MessageConversion {
 
-  def fromFlightMessage(fm: FlightMessage): Arrival = {
+  def fromFlightMessage(fm: FlightMessage): SimpleArrival = {
     val flightCodeRegex: Regex = "^([A-Z0-9]{2,3}?)([0-9]{1,4})([A-Z]?)$".r
 
     val flightNumber = fm.iATA.getOrElse("")
@@ -17,7 +17,7 @@ object MessageConversion {
       case _ => ("", 0)
     }
 
-    Arrival(
+    SimpleArrival(
       carrierCode,
       voyageNumber,
       fm.scheduled.getOrElse(0L),

@@ -3,56 +3,77 @@ package uk.gov.homeoffice.drt.analytics.time
 import org.joda.time.{DateTime, DateTimeZone}
 import org.joda.time.format.ISODateTimeFormat
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.time.{LocalDate, SDateLike, UtcDate}
 
 import scala.util.Try
 
-case class SDate(dateTime: DateTime) {
-
+case class SDate(dateTime: DateTime) extends SDateLike {
   import uk.gov.homeoffice.drt.analytics.time.SDate.implicits._
 
   val europeLondon: DateTimeZone = DateTimeZone.forID("Europe/London")
+  val utc: DateTimeZone = DateTimeZone.forID("UTC")
 
-  def dayOfWeek: Int = dateTime.getDayOfWeek
+  override def getDayOfWeek: Int = dateTime.getDayOfWeek
 
-  def fullYear: Int = dateTime.getYear
+  override def getFullYear: Int = dateTime.getYear
 
-  def month: Int = dateTime.getMonthOfYear
+  override def getMonth: Int = dateTime.getMonthOfYear
 
-  def date: Int = dateTime.getDayOfMonth
+  override def getDate: Int = dateTime.getDayOfMonth
 
-  def hours: Int = dateTime.getHourOfDay
+  override def getHours: Int = dateTime.getHourOfDay
 
-  def minutes: Int = dateTime.getMinuteOfHour
+  override def getMinutes: Int = dateTime.getMinuteOfHour
 
-  def seconds: Int = dateTime.getSecondOfMinute
+  override def getSeconds: Int = dateTime.getSecondOfMinute
 
-  def addDays(daysToAdd: Int): SDate = dateTime.plusDays(daysToAdd)
+  override def addDays(daysToAdd: Int): SDate = dateTime.plusDays(daysToAdd)
 
-  def addMonths(monthsToAdd: Int): SDate = dateTime.plusMonths(monthsToAdd)
+  override def addMonths(monthsToAdd: Int): SDate = dateTime.plusMonths(monthsToAdd)
 
-  def addHours(hoursToAdd: Int): SDate = dateTime.plusHours(hoursToAdd)
+  override def addHours(hoursToAdd: Int): SDate = dateTime.plusHours(hoursToAdd)
 
-  def addMinutes(mins: Int): SDate = dateTime.plusMinutes(mins)
+  override def addMinutes(mins: Int): SDate = dateTime.plusMinutes(mins)
 
-  def addMillis(millisToAdd: Int): SDate = dateTime.plusMillis(millisToAdd)
+  override def addMillis(millisToAdd: Int): SDate = dateTime.plusMillis(millisToAdd)
 
-  def millisSinceEpoch: Long = dateTime.getMillis
+  override def millisSinceEpoch: Long = dateTime.getMillis
 
-  def toISOString: String = SDate.jodaSDateToIsoString(dateTime)
+  override def toISOString: String = SDate.jodaSDateToIsoString(dateTime)
 
-  def toISODateOnly: String = f"$fullYear-$month%02d-$date%02d"
+  override def getZone: String = dateTime.getZone.getID
 
-  def zone: String = dateTime.getZone.getID
+  override def getTimeZoneOffsetMillis: Long = dateTime.getZone.getOffset(millisSinceEpoch)
 
-  def timeZoneOffsetMillis: Long = dateTime.getZone.getOffset(millisSinceEpoch)
-
-  def toIsoMidnight = f"$fullYear%02d-$month%02d-$date%02dT00:00"
-
-  def getLocalLastMidnight: SDate = {
+  override def getLocalLastMidnight: SDate = {
     val localNow = SDate(dateTime, europeLondon)
     SDate(localNow.toIsoMidnight, europeLondon)
   }
 
+  private lazy val toLocal: SDateLike = SDate(dateTime, europeLondon)
+
+  override def toLocalDateTimeString(): String = {
+    f"${toLocal.getFullYear()}-${toLocal.getMonth()}%02d-${toLocal.getDate()}%02d ${toLocal.getHours()}%02d:${toLocal.getMinutes()}%02d"
+  }
+
+  override def toLocalDate: LocalDate = LocalDate(toLocal.getFullYear(), toLocal.getMonth(), toLocal.getDate())
+
+  override def toUtcDate: UtcDate = {
+    val utcLastMidnight = getUtcLastMidnight
+    UtcDate(utcLastMidnight.getFullYear(), utcLastMidnight.getMonth(), utcLastMidnight.getDate())
+  }
+
+  override def startOfTheMonth(): SDateLike = SDate(dateTime.getFullYear(), dateTime.getMonth(), 1, 0, 0, europeLondon)
+
+  override def getUtcLastMidnight: SDateLike = {
+    val utcNow = SDate(dateTime, utc)
+    SDate(utcNow.toIsoMidnight, utc)
+  }
+
+  override def getLocalNextMidnight: SDateLike = {
+    val nextDay = getLocalLastMidnight.addDays(1)
+    SDate(nextDay.toIsoMidnight, europeLondon)
+  }
 }
 
 object SDate {

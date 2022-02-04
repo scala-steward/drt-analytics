@@ -5,22 +5,28 @@ ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
 lazy val akkaHttpVersion = "10.1.9"
-lazy val akkaVersion = "2.5.23"
+lazy val akkaVersion = "2.6.18"
 lazy val akkaPersistenceJdbcVersion = "3.5.0"
 lazy val akkaPersistenceInMemoryVersion = "2.4.18.1"
 lazy val postgresVersion = "42.2.2"
 lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
-lazy val jacksonDatabindVersion = "2.10.0"
+lazy val jacksonDatabindVersion = "2.12.0"
 lazy val specs2Version = "4.6.0"
-lazy val drtLib = "v51"
+lazy val drtLib = "v148"
+lazy val sparkVersion = "3.2.0"
+lazy val scalaTestVersion = "3.2.9"
+
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
   "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
+  "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
+  "org.apache.spark" %% "spark-mllib" % sparkVersion,
+  "org.apache.spark" %% "spark-sql" % sparkVersion,
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
   "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",
@@ -48,6 +54,8 @@ lazy val root = (project in file("."))
     resolvers += "Artifactory Realm" at "https://artifactory.digital.homeoffice.gov.uk/",
     resolvers += "Artifactory Realm release local" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
+
+    Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
 
   )
   .enablePlugins(DockerPlugin)

@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+package server.protobuf.messages;
+
+import "FlightsMessage.proto";
+
+message FlightsWithSplitsMessage {
+  repeated FlightWithSplitsMessage flightWithSplits = 1;
+}
+
+message FlightsWithSplitsDiffMessage {
+  optional int64 createdAt = 1;
+  repeated UniqueArrivalMessage removals = 2;
+  repeated FlightWithSplitsMessage updates = 3;
+}
+
+message FlightWithSplitsMessage {
+  optional FlightMessage flight = 1;
+  repeated SplitMessage splits = 2;
+  optional int64 lastUpdated = 3;
+}
+
+message SplitMessage {
+  repeated PaxTypeAndQueueCountMessage paxTypeAndQueueCount = 1;
+  optional string source = 2;
+  optional string eventType = 4;
+  optional string style = 3;
+}
+
+message PaxTypeAndQueueCountMessage {
+  optional string paxType = 1;
+  optional string queueType = 2;
+  optional double paxValue = 3;
+  repeated SplitNationalityCountMessage nationalities = 5;
+  repeated SplitAgeCountMessage ages = 6;
+}
+
+message SplitNationalityCountMessage {
+  optional string paxNationality = 1;
+  optional double count = 2;
+}
+
+message SplitAgeCountMessage {
+  optional int32 paxAge = 1;
+  optional double count = 2;
+}

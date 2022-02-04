@@ -5,9 +5,10 @@ import akka.persistence._
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import server.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
+import uk.gov.homeoffice.drt.analytics.{Arrivals, SimpleArrival}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion
 import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.analytics.{Arrival, Arrivals, UniqueArrival}
+import uk.gov.homeoffice.drt.arrivals.UniqueArrival
 
 import scala.collection.mutable
 
@@ -21,7 +22,7 @@ object ArrivalsActor {
 class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)
 
-  var arrivals: mutable.Map[UniqueArrival, Arrival] = mutable.Map()
+  var arrivals: mutable.Map[UniqueArrival, SimpleArrival] = mutable.Map()
 
   override def receiveRecover: Receive = {
     case SnapshotOffer(md, FlightStateSnapshotMessage(flightMessages, _)) =>
@@ -31,7 +32,7 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends Persi
         .map(a => (a.uniqueArrival, a))
 
     case FlightsDiffMessage(_, removals, updates, _) =>
-      arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L)))
+      arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L), m.origin.getOrElse("")))
       arrivals ++= updates.map(MessageConversion.fromFlightMessage).map(a => (a.uniqueArrival, a))
 
     case _: FeedStatusMessage =>
