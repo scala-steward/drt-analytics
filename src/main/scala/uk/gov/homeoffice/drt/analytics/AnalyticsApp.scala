@@ -2,7 +2,7 @@ package uk.gov.homeoffice.drt.analytics
 
 import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
@@ -21,7 +21,6 @@ object AnalyticsApp extends App {
 
   implicit val system: ActorSystem = ActorSystem("DrtAnalytics")
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-  implicit val mat: ActorMaterializer = ActorMaterializer()
   implicit val timeout: Timeout = new Timeout(5 seconds)
 
   val portCode = PortCode(config.getString("port-code").toUpperCase)
@@ -44,7 +43,6 @@ object AnalyticsApp extends App {
       }
 
       Await.ready(eventualUpdates, 30 minutes)
-      system.terminate()
       System.exit(0)
   }
 }
