@@ -11,6 +11,7 @@ target
 .history/
 .lib/
 dist/*
+.bsp/sbt.json
 
 # IntelliJ IDEA
 .idea
