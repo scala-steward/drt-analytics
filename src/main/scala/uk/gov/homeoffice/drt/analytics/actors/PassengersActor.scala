@@ -41,7 +41,6 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
       log.warn(s"Ignoring OriginTerminalPaxCountsMessage with missing origin and/or terminal")
 
     case RecoveryCompleted =>
-      log.info(s"Recovery completed")
 
     case u =>
       log.info(s"Got unexpected recovery msg: $u")
@@ -49,7 +48,6 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
 
   private def applyPaxCountMessages(origin: String, terminal: String, countMessages: Seq[PaxCountMessage]): Unit = {
     val relevantPaxCounts = filterRelevantPaxCounts(countMessages)
-    log.info(s"Applying ${relevantPaxCounts.size} counts for $origin -> $terminal")
     val updatesForOriginTerminal = messagesToUpdates(relevantPaxCounts)
     val originAndTerminal = OriginAndTerminal(origin, terminal)
     val updatedOriginTerminal = originTerminalPaxNosState.getOrElse(originAndTerminal, Map()) ++ updatesForOriginTerminal
@@ -81,7 +79,7 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
       sender() ! Ack
 
     case originTerminalPaxNosForDay: OriginTerminalDailyPaxCountsOnDay =>
-      log.info(s"Received OriginTerminalDailyPaxCountsOnDay with ${originTerminalPaxNosForDay.counts.dailyPax.size} updates")
+      log.debug(s"Received OriginTerminalDailyPaxCountsOnDay with ${originTerminalPaxNosForDay.counts.dailyPax.size} updates")
       persistDiffAndUpdateState(originTerminalPaxNosForDay, sender())
 
     case oAndT: OriginAndTerminal =>
@@ -112,7 +110,7 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
       persistAndMaybeSnapshot(message, Option((replyTo, Ack)))
       updateState(origin, terminal, updateForState)
     } else {
-      log.info(s"Empty diff. Nothing to persist")
+      log.debug(s"Empty diff. Nothing to persist")
       replyTo ! Ack
     }
   }

@@ -33,7 +33,6 @@ class TouchdownPredictionActor(val now: () => SDate,
 
   override def processRecoveryMessage: PartialFunction[Any, Unit] = {
     case msg: ModelAndFeaturesMessage =>
-      log.info(s"recovering state from ModelAndFeaturesMessage")
       state = Option(modelAndFeaturesFromMessage(msg))
   }
 
@@ -49,7 +48,6 @@ class TouchdownPredictionActor(val now: () => SDate,
 
   override def receiveCommand: Receive = {
     case maf: ModelAndFeatures =>
-      log.info(s"Received model and features for $uniqueId")
       state = Option(maf)
       val replyToAndAck = Option(sender(), Ack)
       persistAndMaybeSnapshot(modelAndFeaturesToMessage(maf, now().millisSinceEpoch), replyToAndAck)

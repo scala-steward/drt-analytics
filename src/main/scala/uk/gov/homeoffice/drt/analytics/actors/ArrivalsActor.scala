@@ -38,7 +38,6 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends Persi
     case _: FeedStatusMessage =>
 
     case RecoveryCompleted =>
-      log.info(s"Recovery completed")
 
     case u =>
       log.info(s"Got unexpected recovery msg: $u")
@@ -46,7 +45,6 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends Persi
 
   override def receiveCommand: Receive = {
     case GetArrivals(start, end) =>
-      log.info("Got request for arrivals")
       sender() ! Arrivals(Map() ++ arrivals.filter { case (_, a) =>
         val arrivalDate = SDate(a.scheduled, DateTimeZone.forID("Europe/London")).toISODateOnly
         start.toISODateOnly <= arrivalDate && arrivalDate <= end.toISODateOnly

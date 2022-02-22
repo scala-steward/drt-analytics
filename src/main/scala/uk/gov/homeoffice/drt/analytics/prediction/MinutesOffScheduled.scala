@@ -51,7 +51,6 @@ case class MinutesOffScheduled[T <: MinutesOffScheduledActor](actorClass: Class[
     actor
       .ask(GetState).mapTo[Map[ArrivalKeyWithOrigin, Int]]
       .map { arrivals =>
-        log.info(s"Got data for $terminal / ${currentDay.toISODateOnly}")
         actor ! PoisonPill
         arrivals
       }
