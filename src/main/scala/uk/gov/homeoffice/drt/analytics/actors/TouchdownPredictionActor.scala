@@ -48,8 +48,14 @@ class TouchdownPredictionActor(val now: () => SDate,
 
   override def receiveCommand: Receive = {
     case maf: ModelAndFeatures =>
-      state = Option(maf)
-      val replyToAndAck = Option(sender(), Ack)
-      persistAndMaybeSnapshot(modelAndFeaturesToMessage(maf, now().millisSinceEpoch), replyToAndAck)
+      val isUpdated = state match {
+        case Some(existingMaf) => maf != existingMaf
+        case None => true
+      }
+      if (isUpdated) {
+        state = Option(maf)
+        val replyToAndAck = Option(sender(), Ack)
+        persistAndMaybeSnapshot(modelAndFeaturesToMessage(maf, now().millisSinceEpoch), replyToAndAck)
+      }
   }
 }
