@@ -29,7 +29,7 @@ class TouchdownPredictionActor(val now: () => SDate,
 
   private val uniqueId = s"$terminal-$number-$origin"
 
-  override def persistenceId: String = s"touchdown-prediction-$uniqueId".toLowerCase
+  override def persistenceId: String = s"test-touchdown-prediction-$uniqueId".toLowerCase
 
   override def processRecoveryMessage: PartialFunction[Any, Unit] = {
     case msg: ModelAndFeaturesMessage =>
