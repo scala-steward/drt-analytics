@@ -3,7 +3,7 @@ package uk.gov.homeoffice.drt.analytics.actors
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.slf4j.{Logger, LoggerFactory}
 import scalapb.GeneratedMessage
-import server.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
+import uk.gov.homeoffice.drt.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.prediction.{ModelAndFeatures, RegressionModel}
 

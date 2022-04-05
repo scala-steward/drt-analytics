@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.persistence._
 import org.slf4j.{Logger, LoggerFactory}
 import scalapb.GeneratedMessage
-import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage}
 import uk.gov.homeoffice.drt.analytics.OriginTerminalDailyPaxCountsOnDay
 import uk.gov.homeoffice.drt.analytics.actors.PassengersActor.relevantPaxCounts
 import uk.gov.homeoffice.drt.analytics.time.SDate

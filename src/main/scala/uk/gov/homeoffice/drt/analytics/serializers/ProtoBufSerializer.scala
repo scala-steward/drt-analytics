@@ -1,10 +1,10 @@
 package uk.gov.homeoffice.drt.analytics.serializers
 
 import akka.serialization.SerializerWithStringManifest
-import server.protobuf.messages.CrunchState.{FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
-import server.protobuf.messages.FlightsMessage._
-import server.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
-import server.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage, PaxCountsMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage._
+import uk.gov.homeoffice.drt.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
+import uk.gov.homeoffice.drt.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage}
 
 class ProtoBufSerializer extends SerializerWithStringManifest {
   override def identifier: Int = 9001
@@ -18,7 +18,6 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
   final val FeedStatus: String                    = classOf[FeedStatusMessage].getName
   final val FeedStatuses: String                  = classOf[FeedStatusesMessage].getName
   final val PaxCount: String                      = classOf[PaxCountMessage].getName
-  final val PaxCounts: String                     = classOf[PaxCountsMessage].getName
   final val OriginTerminalPaxCounts: String       = classOf[OriginTerminalPaxCountsMessage].getName
   final val OriginTerminalPaxCountss: String      = classOf[OriginTerminalPaxCountsMessages].getName
   final val FlightsWithSplits: String             = classOf[FlightsWithSplitsMessage].getName
@@ -34,7 +33,6 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
       case m: FeedStatusMessage => m.toByteArray
       case m: FeedStatusesMessage => m.toByteArray
       case m: PaxCountMessage => m.toByteArray
-      case m: PaxCountsMessage => m.toByteArray
       case m: OriginTerminalPaxCountsMessage => m.toByteArray
       case m: OriginTerminalPaxCountsMessages => m.toByteArray
       case m: FlightsWithSplitsMessage => m.toByteArray
@@ -52,7 +50,6 @@ class ProtoBufSerializer extends SerializerWithStringManifest {
       case FeedStatus                     => FeedStatusMessage.parseFrom(bytes)
       case FeedStatuses                   => FeedStatusesMessage.parseFrom(bytes)
       case PaxCount                       => PaxCountMessage.parseFrom(bytes)
-      case PaxCounts                      => PaxCountsMessage.parseFrom(bytes)
       case OriginTerminalPaxCounts        => OriginTerminalPaxCountsMessage.parseFrom(bytes)
       case OriginTerminalPaxCountss       => OriginTerminalPaxCountsMessages.parseFrom(bytes)
       case FlightsWithSplits              => FlightsWithSplitsMessage.parseFrom(bytes)

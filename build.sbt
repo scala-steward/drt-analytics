@@ -13,7 +13,7 @@ lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.12.0"
 lazy val specs2Version = "4.6.0"
-lazy val drtLib = "v158"
+lazy val drtLib = "v179"
 lazy val sparkVersion = "3.2.0"
 lazy val scalaTestVersion = "3.2.9"
 
@@ -38,18 +38,13 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
-  "uk.gov.homeoffice" %%% "drt-lib" % drtLib,
+  "uk.gov.homeoffice" %% "drt-lib" % drtLib,
 )
 
 lazy val root = (project in file("."))
   .settings(
     name := "drt-analytics",
     trapExit := false,
-
-    PB.targets in Compile := Seq(
-      scalapb.gen() -> (sourceManaged in Compile).value / "protobuf"
-    ),
-    PB.deleteTargetDirectory := false,
 
     resolvers += "Artifactory Realm" at "https://artifactory.digital.homeoffice.gov.uk/",
     resolvers += "Artifactory Realm release local" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
