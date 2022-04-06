@@ -4,7 +4,7 @@ import akka.actor.Props
 import akka.persistence._
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
-import server.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
 import uk.gov.homeoffice.drt.analytics.{Arrivals, SimpleArrival}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion
 import uk.gov.homeoffice.drt.analytics.time.SDate

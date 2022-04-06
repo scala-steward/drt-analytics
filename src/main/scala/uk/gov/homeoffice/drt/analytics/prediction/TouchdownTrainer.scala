@@ -71,7 +71,7 @@ object TouchdownTrainer {
 
           val improvementPct = calculateImprovementPct(dataSet, withIndex, model, validationSetPct)
 
-          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModelFromSpark(model), dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct.toInt)
+          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModelFromSpark(model), dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct)
 
           val actor = system.actorOf(Props(new TouchdownPredictionActor(() => SDate.now(), terminal, number, origin)))
           actor.ask(modelAndFeatures).map(_ => actor ! PoisonPill)

@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.messages
 
-import server.protobuf.messages.FlightsMessage.FlightMessage
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.FlightMessage
 import uk.gov.homeoffice.drt.analytics.SimpleArrival
 
 import scala.util.matching.Regex

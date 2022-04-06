@@ -7,8 +7,8 @@ import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.slf4j.LoggerFactory
-import server.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
-import server.protobuf.messages.FlightsMessage.UniqueArrivalMessage
+import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
 import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, FlightRoute, GetState}
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.arrivals.Arrival
