@@ -5,6 +5,7 @@ import akka.testkit.{TestKit, TestProbe}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import scalapb.GeneratedMessage
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.FlightRoute
 import uk.gov.homeoffice.drt.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
 import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
@@ -12,7 +13,7 @@ import uk.gov.homeoffice.drt.prediction.{FeaturesWithOneToManyValues, Regression
 
 import scala.concurrent.duration.DurationInt
 
-class MockTouchdownPredictionActor(probeRef: ActorRef) extends TouchdownPredictionActor(() => SDate.now(), "T1", 100, "JFK") {
+class MockTouchdownPredictionActor(probeRef: ActorRef) extends TouchdownPredictionActor(() => SDate.now(), FlightRoute("T1", 100, "JFK")) {
   override def persistAndMaybeSnapshot(messageToPersist: GeneratedMessage, maybeAck: Option[(ActorRef, Any)]): Unit = {
     probeRef ! messageToPersist
   }

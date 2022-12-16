@@ -2,21 +2,22 @@ package uk.gov.homeoffice.drt.analytics.prediction
 
 import akka.actor.{ActorSystem, Props, Terminated}
 import akka.pattern.ask
+import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, GetState}
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActorImpl
+import uk.gov.homeoffice.drt.analytics.actors.FlightValueExtractionActor
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.offScheduledMinutes
 import uk.gov.homeoffice.drt.analytics.time.SDate
-import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
+import uk.gov.homeoffice.drt.ports.Terminals.T2
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
 
-class MinutesOffScheduledMock extends MinutesOffScheduledActorImpl(T2, 2020, 10, 1) {
+class MinutesOffScheduledMock extends FlightValueExtractionActor(T2, 2020, 10, 1, offScheduledMinutes) {
   byKey = Map(ArrivalKey(0L, "T2", 1) -> (2, "MMM"))
 }
 
@@ -51,7 +52,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val start = SDate(2020, 10, 1, 0, 0)
             val days = 10
 
-            val arrivals = MinutesOffScheduled(classOf[MinutesOffScheduledActorImpl]).offScheduledByTerminalFlightNumberOrigin(T2, start, days)
+            val arrivals = ValuesExtractorForFlightRoutes[FlightValueExtractionActor](classOf[FlightValueExtractionActor], offScheduledMinutes).extractedValueByFlightRoute(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)
 

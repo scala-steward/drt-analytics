@@ -2,11 +2,11 @@ package uk.gov.homeoffice.drt.analytics
 
 import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.analytics.prediction.TouchdownTrainer
+import uk.gov.homeoffice.drt.analytics.actors.TouchdownExamplesAndUpdates
+import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
@@ -35,8 +35,16 @@ object AnalyticsApp extends App {
     case Some(portConfig) =>
       log.info(s"Looking for job ${config.getString("options.job-name")}")
       val eventualUpdates = config.getString("options.job-name").toLowerCase match {
-        case "update-pax-counts" => PassengerCounts.updateForPort(portConfig, daysToLookBack)
-        case "update-touchdown-models" => TouchdownTrainer.trainForPort(portConfig)
+        case "update-pax-counts" =>
+          PassengerCounts.updateForPort(portConfig, daysToLookBack)
+        case "update-touchdown-models" =>
+          FlightRouteValuesTrainer(TouchdownExamplesAndUpdates())
+            .trainTerminals(portConfig.terminals.toList)
+
+        case "update-chox-models" =>
+//          FlightRouteValuesTrainer(FlightsMessageValueExtractor.touchdownToChoxMinutes)
+//            .trainTerminals(portConfig.terminals.toList)
+          Future.successful(Done)
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
           Future.successful(Done)

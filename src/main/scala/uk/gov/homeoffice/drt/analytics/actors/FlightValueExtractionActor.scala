@@ -1,53 +1,32 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.NotUsed
-import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
-import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import akka.stream.scaladsl.Source
-import akka.util.Timeout
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.{ArrivalKey, ArrivalKeyWithOrigin, FlightRoute, GetState}
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-import scala.util.matching.Regex
 
 
-trait MinutesOffScheduledActor extends Actor {
-  val terminal: Terminal
-  val year: Int
-  val month: Int
-  val day: Int
-}
-
-object MinutesOffScheduledActor {
-  case object GetState
-
-  case class FlightRoute(terminal: String, number: Int, origin: String)
-
-  case class ArrivalKey(scheduled: Long, terminal: String, number: Int)
-
-  case class ArrivalKeyWithOrigin(scheduled: Long, terminal: String, number: Int, origin: String)
-}
-
-class MinutesOffScheduledActorImpl(val terminal: Terminal, val year: Int, val month: Int, val day: Int) extends MinutesOffScheduledActor with PersistentActor {
+class FlightValueExtractionActor(val terminal: Terminal,
+                                 val year: Int,
+                                 val month: Int,
+                                 val day: Int,
+                                 val extractValue: FlightWithSplitsMessage => Option[Double],
+                                ) extends TerminalDateActor with PersistentActor {
   private val log = LoggerFactory.getLogger(getClass)
 
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-$year-$month%02d-$day%02d"
 
-  var byKey: Map[ArrivalKey, (Int, String)] = Map()
-  var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, Int] = Map()
+  var byKey: Map[ArrivalKey, (Double, String)] = Map()
+  var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, Double] = Map()
 
-  def parseCarrierAndFlightNumber(code: String): Option[(String, Int)] = {
+  def parseFlightNumber(code: String): Option[Int] = {
     code match {
-      case Arrival.flightCodeRegex(carrier, flightNumber, _) =>
-        Try(flightNumber.toInt).toOption.map(n => (carrier, n))
+      case Arrival.flightCodeRegex(_, flightNumber, _) => Try(flightNumber.toInt).toOption
       case _ => None
     }
   }
@@ -88,13 +67,13 @@ class MinutesOffScheduledActorImpl(val terminal: Terminal, val year: Int, val mo
   private def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit =
     for {
       flightCode <- u.getFlight.iATA
-      (carrier, flightNumber) <- parseCarrierAndFlightNumber(flightCode)
+      flightNumber <- parseFlightNumber(flightCode)
       terminal <- u.getFlight.terminal
       scheduled <- u.getFlight.scheduled
-      touchdown <- u.getFlight.touchdown
       origin <- u.getFlight.origin
+      extractedValue <- extractValue(u)
     } yield {
-      byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), ((touchdown - scheduled).toInt, origin))
+      byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), (extractedValue, origin))
     }
 
   override def receiveCommand: Receive = {

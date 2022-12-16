@@ -1,32 +1,30 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.Done
-import akka.actor.{ActorSystem, PoisonPill, Props}
-import akka.pattern.ask
+import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
+import akka.{Done, NotUsed}
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.analytics.actors.MinutesOffScheduledActor.FlightRoute
+import uk.gov.homeoffice.drt.analytics.actors.{ExamplesAndUpdates, ModelUpdate}
 import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.RegressionModelFromSpark
-import uk.gov.homeoffice.drt.analytics.actors.{MinutesOffScheduledActorImpl, TouchdownPredictionActor}
 import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.ports.{AirportConfig, Terminals}
 import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
-import uk.gov.homeoffice.drt.prediction.TouchdownModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.{FeaturesWithOneToManyValues, RegressionModel}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object TouchdownTrainer {
+case class FlightRouteValuesTrainer[MI](examplesAndUpdates: ExamplesAndUpdates[MI]) {
   private val log = LoggerFactory.getLogger(getClass)
 
-  def trainForPort(portConfig: AirportConfig)
-                  (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
-    Source(portConfig.terminals.toList)
+  def trainTerminals(terminals: List[Terminal])
+                    (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
+    Source(terminals)
       .mapAsync(1) { terminal =>
         train(150, 20, terminal).map(r => logStats(terminal, r))
       }
@@ -55,33 +53,32 @@ object TouchdownTrainer {
 
     val trainingSetPct = 100 - validationSetPct
 
-    MinutesOffScheduled(classOf[MinutesOffScheduledActorImpl])
-      .offScheduledByTerminalFlightNumberOrigin(terminal, start, daysOfData)
+    examplesAndUpdates.modelIdWithExamples(terminal, start, daysOfData)
       .map {
-        case (_, offScheduleExamples) if offScheduleExamples.size <= 5 => None
-        case (FlightRoute(terminal, number, origin), offScheduleExamples) =>
-          val withIndex: Map[(Long, Int), Int] = addIndex(offScheduleExamples)
+        case (modelIdentifier, fullExamples) =>
+          val withIndex: Map[(Long, Double), Int] = fullExamples.zipWithIndex
           val dataFrame = prepareDataFrame(columnNames, withIndex)
-          val withoutOutliers = removeOutliers(dataFrame)
+          removeOutliers(dataFrame) match {
+            case examples if examples.count() <= 5 =>
+              examplesAndUpdates.updateModel(modelIdentifier, None)
 
-          val trainingExamples = (offScheduleExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
+              None
+            case withoutOutliers =>
+              val trainingExamples = (fullExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
+              val dataSet = DataSet(withoutOutliers, features)
+              val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
+              val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct)
+              val regressionModel = RegressionModelFromSpark(lrModel)
+              val updateModel = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct)
+              examplesAndUpdates.updateModel(modelIdentifier, Option(updateModel))
 
-          val dataSet = DataSet(withoutOutliers, features)
-          val model: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
-
-          val improvementPct = calculateImprovementPct(dataSet, withIndex, model, validationSetPct)
-
-          val modelAndFeatures = TouchdownModelAndFeatures(RegressionModelFromSpark(model), dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct)
-
-          val actor = system.actorOf(Props(new TouchdownPredictionActor(() => SDate.now(), terminal, number, origin)))
-          actor.ask(modelAndFeatures).map(_ => actor ! PoisonPill)
-
-          Some(improvementPct)
+              Some(improvementPct)
+          }
       }
       .runWith(Sink.seq)
   }
 
-  private def calculateImprovementPct(dataSet: DataSet, withIndex: Map[(Long, Int), Int], model: LinearRegressionModel, validationSetPct: Int)
+  private def calculateImprovementPct(dataSet: DataSet, withIndex: Map[(Long, Double), Int], model: LinearRegressionModel, validationSetPct: Int)
                                      (implicit session: SparkSession): Double = {
     val labelsAndPredictions = dataSet
       .predict("label", validationSetPct, model)
@@ -94,11 +91,11 @@ object TouchdownTrainer {
             (label.toDouble, prediction.toDouble)
         }.getOrElse((0d, 0d))
       }
-    val labelsAndScheduleds = dataSet.df.rdd.map { r =>
+    val labelsAndValues = dataSet.df.rdd.map { r =>
       (r.getAs[Double]("label"), 0d)
     }
     val predMetrics = new RegressionMetrics(labelsAndPredictions)
-    val schMetrics = new RegressionMetrics(labelsAndScheduleds)
+    val schMetrics = new RegressionMetrics(labelsAndValues)
     val improvement = schMetrics.rootMeanSquaredError - predMetrics.rootMeanSquaredError
     val pctImprovement = (improvement / schMetrics.rootMeanSquaredError) * 100
 
@@ -107,24 +104,18 @@ object TouchdownTrainer {
     pctImprovement
   }
 
-  private def prepareDataFrame(columnNames: List[String], offScheduledsWithIndex: Map[(Long, Int), Int])
+  private def prepareDataFrame(columnNames: List[String], valuesZippedWithIndex: Map[(Long, Double), Int])
                               (implicit session: SparkSession): Dataset[Row] = {
     import session.implicits._
 
-    offScheduledsWithIndex
+    valuesZippedWithIndex
       .map {
-        case ((scheduled, offScheduled), idx) =>
-          val mornAft = s"${SDate(scheduled).getHours / 12}"
-          (offScheduled.toDouble, SDate(scheduled).getDayOfWeek.toString, mornAft, idx.toString)
+        case ((scheduledMillis, targetValue), idx) =>
+          val mornAft = s"${SDate(scheduledMillis).getHours / 12}"
+          (targetValue, SDate(scheduledMillis).getDayOfWeek.toString, mornAft, idx.toString)
       }
       .toList.toDF(columnNames: _*)
       .sort("label")
-  }
-
-  private def addIndex(offScheduleds: Map[Long, Int]): Map[(Long, Int), Int] = {
-    offScheduleds
-      .map { case (sch, off) => (sch, off / 60000) }
-      .zipWithIndex
   }
 
   private def removeOutliers(dataFrame: Dataset[Row]): Dataset[Row] = {
