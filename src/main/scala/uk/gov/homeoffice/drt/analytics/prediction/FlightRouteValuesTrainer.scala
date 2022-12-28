@@ -7,19 +7,30 @@ import akka.util.Timeout
 import akka.{Done, NotUsed}
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
+import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.analytics.actors.{ExamplesAndUpdates, ModelUpdate}
-import uk.gov.homeoffice.drt.analytics.actors.TouchdownPredictionActor.RegressionModelFromSpark
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, RegressionModelFromSpark}
+import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.{ModelExamplesProvider, ModelUpdateService}
 import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
-import uk.gov.homeoffice.drt.prediction.{FeaturesWithOneToManyValues, RegressionModel}
+import uk.gov.homeoffice.drt.prediction.Feature
+import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.seqAsJavaListConverter
 
-case class FlightRouteValuesTrainer[MI](examplesAndUpdates: ExamplesAndUpdates[MI]) {
+object FlightRouteValuesTrainer {
+  type ModelExamplesProvider[MI] = (Terminal, SDateLike, Int) => Source[(MI, Iterable[(Double, Seq[String])]), NotUsed]
+  type ModelUpdateService[MI] = (MI, Option[ModelUpdate]) => Future[_]
+}
+
+case class FlightRouteValuesTrainer[MI](targetName: String,
+                                        examplesProvider: ModelExamplesProvider[MI],
+                                        updateService: ModelUpdateService[MI],
+                                        baselineValue: Double,
+                                       ) {
   private val log = LoggerFactory.getLogger(getClass)
 
   def trainTerminals(terminals: List[Terminal])
@@ -40,7 +51,6 @@ case class FlightRouteValuesTrainer[MI](examplesAndUpdates: ExamplesAndUpdates[M
 
   def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
            (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Seq[Option[Double]]] = {
-
     implicit val session: SparkSession = SparkSession
       .builder
       .appName("DRT Analytics")
@@ -48,37 +58,43 @@ case class FlightRouteValuesTrainer[MI](examplesAndUpdates: ExamplesAndUpdates[M
       .getOrCreate()
 
     val start = SDate.now().addDays(-1)
-    val columnNames = List("label", "dayOfTheWeek", "partOfDay", "index")
-    val features = List(OneToMany(List("dayOfTheWeek"), "dow"), OneToMany(List("partOfDay"), "pod"))
+    val features: List[Feature] = List(OneToMany(List("dayOfTheWeek"), "dow"), OneToMany(List("partOfDay"), "pod"))
+    val featureColumnNames: List[String] = features.flatMap {
+      case OneToMany(colNames, _) => colNames
+      case Single(colName) => List(colName)
+    }
 
     val trainingSetPct = 100 - validationSetPct
 
-    examplesAndUpdates.modelIdWithExamples(terminal, start, daysOfData)
+    examplesProvider(terminal, start, daysOfData)
       .map {
-        case (modelIdentifier, fullExamples) =>
-          val withIndex: Map[(Long, Double), Int] = fullExamples.zipWithIndex
-          val dataFrame = prepareDataFrame(columnNames, withIndex)
+        case (modelIdentifier, allExamples) =>
+          val withIndex: Iterable[((Double, Seq[String]), Int)] = allExamples.zipWithIndex
+          val dataFrame = prepareDataFrame(featureColumnNames, withIndex)
           removeOutliers(dataFrame) match {
             case examples if examples.count() <= 5 =>
-              examplesAndUpdates.updateModel(modelIdentifier, None)
-
+              updateService(modelIdentifier, None)
               None
             case withoutOutliers =>
-              val trainingExamples = (fullExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
+              val trainingExamples = (allExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
               val dataSet = DataSet(withoutOutliers, features)
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
-              val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct)
+              val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct, baselineValue)
               val regressionModel = RegressionModelFromSpark(lrModel)
-              val updateModel = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct)
-              examplesAndUpdates.updateModel(modelIdentifier, Option(updateModel))
-
+              val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, targetName)
+              updateService(modelIdentifier, Option(modelUpdate))
               Some(improvementPct)
           }
       }
       .runWith(Sink.seq)
   }
 
-  private def calculateImprovementPct(dataSet: DataSet, withIndex: Map[(Long, Double), Int], model: LinearRegressionModel, validationSetPct: Int)
+  private def calculateImprovementPct(dataSet: DataSet,
+                                      withIndex: Iterable[((Double, Seq[String]), Int)],
+                                      model: LinearRegressionModel,
+                                      validationSetPct: Int,
+                                      baselineValue: Double,
+                                     )
                                      (implicit session: SparkSession): Double = {
     val labelsAndPredictions = dataSet
       .predict("label", validationSetPct, model)
@@ -86,13 +102,14 @@ case class FlightRouteValuesTrainer[MI](examplesAndUpdates: ExamplesAndUpdates[M
       .map { row =>
         val idx = row.getAs[String]("index")
         withIndex.find(_._2.toString == idx).map {
-          case ((_, label), _) =>
+          case ((label, _), _) =>
             val prediction = Math.round(row.getAs[Double]("prediction"))
-            (label.toDouble, prediction.toDouble)
+            (label, prediction.toDouble)
         }.getOrElse((0d, 0d))
       }
     val labelsAndValues = dataSet.df.rdd.map { r =>
-      (r.getAs[Double]("label"), 0d)
+      val label = r.getAs[Double]("label")
+      (label, baselineValue)
     }
     val predMetrics = new RegressionMetrics(labelsAndPredictions)
     val schMetrics = new RegressionMetrics(labelsAndValues)
@@ -104,18 +121,22 @@ case class FlightRouteValuesTrainer[MI](examplesAndUpdates: ExamplesAndUpdates[M
     pctImprovement
   }
 
-  private def prepareDataFrame(columnNames: List[String], valuesZippedWithIndex: Map[(Long, Double), Int])
+  private def prepareDataFrame(columnNames: List[String], valuesZippedWithIndex: Iterable[((Double, Seq[String]), Int)])
                               (implicit session: SparkSession): Dataset[Row] = {
-    import session.implicits._
 
-    valuesZippedWithIndex
-      .map {
-        case ((scheduledMillis, targetValue), idx) =>
-          val mornAft = s"${SDate(scheduledMillis).getHours / 12}"
-          (targetValue, SDate(scheduledMillis).getDayOfWeek.toString, mornAft, idx.toString)
-      }
-      .toList.toDF(columnNames: _*)
-      .sort("label")
+    val labelField = StructField("label", DoubleType, nullable = false)
+    val indexField = StructField("index", StringType, nullable = false)
+
+    val fields = columnNames.map(columnName =>
+      StructField(columnName, StringType, nullable = false)
+    )
+    val schema = StructType(labelField +: fields :+ indexField)
+
+    val rows = valuesZippedWithIndex.map {
+      case ((labelValue, featureValues), idx) => Row(labelValue +: featureValues :+ idx.toString: _*)
+    }.toList.asJava
+
+    session.createDataFrame(rows, schema).sort("label")
   }
 
   private def removeOutliers(dataFrame: Dataset[Row]): Dataset[Row] = {

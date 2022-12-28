@@ -4,10 +4,11 @@ import akka.actor.ActorRef
 import akka.persistence._
 import org.slf4j.{Logger, LoggerFactory}
 import scalapb.GeneratedMessage
-import uk.gov.homeoffice.drt.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage}
+import uk.gov.homeoffice.drt.actor.RecoveryActorLike
 import uk.gov.homeoffice.drt.analytics.OriginTerminalDailyPaxCountsOnDay
 import uk.gov.homeoffice.drt.analytics.actors.PassengersActor.relevantPaxCounts
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.protobuf.messages.PaxMessage.{OriginTerminalPaxCountsMessage, OriginTerminalPaxCountsMessages, PaxCountMessage}
+import uk.gov.homeoffice.drt.time.SDateLike
 
 case class PointInTimeOriginTerminalDay(pointInTime: Long, origin: String, terminal: String, day: Long)
 
@@ -18,13 +19,13 @@ case object ClearState
 case object Ack
 
 object PassengersActor {
-  def relevantPaxCounts(numDaysInAverage: Int, now: () => SDate)(paxCountMessages: Seq[PaxCountMessage]): Seq[PaxCountMessage] = {
+  def relevantPaxCounts(numDaysInAverage: Int, now: () => SDateLike)(paxCountMessages: Seq[PaxCountMessage]): Seq[PaxCountMessage] = {
     val cutoff = now().getLocalLastMidnight.addDays(-1 * numDaysInAverage).millisSinceEpoch
     paxCountMessages.filter(msg => msg.getDay >= cutoff)
   }
 }
 
-class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryActorLike {
+class PassengersActor(val now: () => SDateLike, daysToRetain: Int) extends RecoveryActorLike {
   override val persistenceId = s"daily-pax"
 
   override val recoveryStartMillis: Long = now().millisSinceEpoch
@@ -107,7 +108,7 @@ class PassengersActor(val now: () => SDate, daysToRetain: Int) extends RecoveryA
     if (diff.nonEmpty) {
       val message = OriginTerminalPaxCountsMessage(Option(origin), Option(terminal), updatesToMessages(diff))
 
-      persistAndMaybeSnapshot(message, Option((replyTo, Ack)))
+      persistAndMaybeSnapshotWithAck(message, List((replyTo, Ack)))
       updateState(origin, terminal, updateForState)
     } else {
       log.debug(s"Empty diff. Nothing to persist")

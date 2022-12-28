@@ -5,11 +5,12 @@ import akka.actor.ActorSystem
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.analytics.actors.TouchdownExamplesAndUpdates
-import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
+import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightExamplesAndUpdates
+import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, FlightsMessageValueExtractor}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
+import uk.gov.homeoffice.drt.prediction.{ToChoxModelAndFeatures, TouchdownModelAndFeatures}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -37,14 +38,19 @@ object AnalyticsApp extends App {
       val eventualUpdates = config.getString("options.job-name").toLowerCase match {
         case "update-pax-counts" =>
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
+
         case "update-touchdown-models" =>
-          FlightRouteValuesTrainer(TouchdownExamplesAndUpdates())
+          val examplesAndUpdates = FlightExamplesAndUpdates(FlightsMessageValueExtractor.minutesOffSchedule, TouchdownModelAndFeatures.targetName)
+          FlightRouteValuesTrainer(TouchdownModelAndFeatures.targetName, examplesAndUpdates.modelIdWithExamples, examplesAndUpdates.updateModel, 0d)
             .trainTerminals(portConfig.terminals.toList)
 
         case "update-chox-models" =>
-//          FlightRouteValuesTrainer(FlightsMessageValueExtractor.touchdownToChoxMinutes)
-//            .trainTerminals(portConfig.terminals.toList)
-          Future.successful(Done)
+          val examplesAndUpdates = FlightExamplesAndUpdates(FlightsMessageValueExtractor.minutesToChox, ToChoxModelAndFeatures.targetName)
+          val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
+          println(s"baseline time to chox: $baselineTimeToChox")
+          FlightRouteValuesTrainer(ToChoxModelAndFeatures.targetName, examplesAndUpdates.modelIdWithExamples, examplesAndUpdates.updateModel, baselineTimeToChox)
+            .trainTerminals(portConfig.terminals.toList)
+
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
           Future.successful(Done)

@@ -2,7 +2,7 @@ package uk.gov.homeoffice.drt.analytics
 
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.DailyPaxCountsOnDay.applyDiffToExisting
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 case class OriginTerminalDailyPaxCountsOnDay(origin: String, terminal: String, counts: DailyPaxCountsOnDay) {
   def applyAndGetDiff(existingCounts: Map[(Long, Long), Int]): (Map[(Long, Long), Int], Iterable[(Long, Long, Int)]) = {
@@ -16,7 +16,7 @@ case class DailyPaxCountsOnDay(dayMillis: Long, dailyPax: Map[Long, Int]) {
 
   import DailyPaxCountsOnDay._
 
-  val day: SDate = SDate(dayMillis)
+  val day: SDateLike = SDate(dayMillis)
 
   def diffFromExisting(existingPaxNos: Map[(Long, Long), Int]): Iterable[(Long, Long, Int)] = dailyPax.map {
     case (incomingDayMillis, incomingPax) =>

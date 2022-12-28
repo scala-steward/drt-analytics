@@ -5,21 +5,23 @@ import akka.testkit.{TestKit, TestProbe}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import scalapb.GeneratedMessage
-import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.FlightRoute
-import uk.gov.homeoffice.drt.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.actor.PredictionModelActor
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.ModelUpdate
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.FlightRoute
 import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
 import uk.gov.homeoffice.drt.prediction.{FeaturesWithOneToManyValues, RegressionModel, TouchdownModelAndFeatures}
+import uk.gov.homeoffice.drt.protobuf.messages.ModelAndFeatures.ModelAndFeaturesMessage
+import uk.gov.homeoffice.drt.time.SDate
 
 import scala.concurrent.duration.DurationInt
 
-class MockTouchdownPredictionActor(probeRef: ActorRef) extends TouchdownPredictionActor(() => SDate.now(), FlightRoute("T1", 100, "JFK")) {
-  override def persistAndMaybeSnapshot(messageToPersist: GeneratedMessage, maybeAck: Option[(ActorRef, Any)]): Unit = {
+class MockTouchdownPredictionActor(probeRef: ActorRef) extends PredictionModelActor(() => SDate.now(), "flight", FlightRoute("T1", 100, "JFK")) {
+  override def persistAndMaybeSnapshotWithAck(messageToPersist: GeneratedMessage, maybeAck:List[(ActorRef, Any)]): Unit = {
     probeRef ! messageToPersist
   }
 }
 
-class TouchdownPredictionActorTest extends TestKit(ActorSystem("TouchdownPredictions"))
+class PredictionModelActorTest extends TestKit(ActorSystem("TouchdownPredictions"))
   with AnyWordSpecLike
   with BeforeAndAfterAll {
 
@@ -28,21 +30,22 @@ class TouchdownPredictionActorTest extends TestKit(ActorSystem("TouchdownPredict
   }
 
   "A touchdown actor" should {
-    val modelAndFeatures = TouchdownModelAndFeatures(RegressionModel(Seq(1, 2, 3), 1.4), FeaturesWithOneToManyValues(List(Single("col_a"), OneToMany(List("col_b", "col_c"), "x")), IndexedSeq("t", "h", "u")), 20, 25)
+    val features = FeaturesWithOneToManyValues(List(Single("col_a"), OneToMany(List("col_b", "col_c"), "x")), IndexedSeq("t", "h", "u"))
+    val modelUpdate = ModelUpdate(RegressionModel(Seq(1, 2), 1.4), features, 10, 10.1, TouchdownModelAndFeatures.targetName)
 
     "Persist an incoming model" in {
       val probe = TestProbe()
       val actor = system.actorOf(Props(new MockTouchdownPredictionActor(probe.ref)))
-      actor ! modelAndFeatures
+      actor ! modelUpdate
       probe.expectMsgClass(classOf[ModelAndFeaturesMessage])
     }
 
     "Not persist an incoming model if it's the same as the last one received" in {
       val probe = TestProbe()
       val actor = system.actorOf(Props(new MockTouchdownPredictionActor(probe.ref)))
-      actor ! modelAndFeatures
+      actor ! modelUpdate
       probe.expectMsgClass(classOf[ModelAndFeaturesMessage])
-      actor ! modelAndFeatures
+      actor ! modelUpdate
       probe.expectNoMessage(250.milliseconds)
     }
   }

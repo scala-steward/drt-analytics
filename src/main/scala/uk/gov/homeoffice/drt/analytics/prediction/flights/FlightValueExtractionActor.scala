@@ -1,8 +1,9 @@
-package uk.gov.homeoffice.drt.analytics.actors
+package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
@@ -15,14 +16,14 @@ class FlightValueExtractionActor(val terminal: Terminal,
                                  val year: Int,
                                  val month: Int,
                                  val day: Int,
-                                 val extractValue: FlightWithSplitsMessage => Option[Double],
+                                 val extractValues: FlightWithSplitsMessage => Option[(Double, Seq[String])],
                                 ) extends TerminalDateActor with PersistentActor {
   private val log = LoggerFactory.getLogger(getClass)
 
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-$year-$month%02d-$day%02d"
 
-  var byKey: Map[ArrivalKey, (Double, String)] = Map()
-  var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, Double] = Map()
+  var byKey: Map[ArrivalKey, ((Double, Seq[String]), String)] = Map()
+  var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, (Double, Seq[String])] = Map()
 
   def parseFlightNumber(code: String): Option[Int] = {
     code match {
@@ -71,9 +72,9 @@ class FlightValueExtractionActor(val terminal: Terminal,
       terminal <- u.getFlight.terminal
       scheduled <- u.getFlight.scheduled
       origin <- u.getFlight.origin
-      extractedValue <- extractValue(u)
+      extractedValues <- extractValues(u)
     } yield {
-      byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), (extractedValue, origin))
+      byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), (extractedValues, origin))
     }
 
   override def receiveCommand: Receive = {
