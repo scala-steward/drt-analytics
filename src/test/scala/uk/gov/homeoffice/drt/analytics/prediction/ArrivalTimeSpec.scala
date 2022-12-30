@@ -11,13 +11,13 @@ import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.minutesOffSchedule
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightRoutesValuesExtractor, FlightValueExtractionActor}
 import uk.gov.homeoffice.drt.ports.Terminals.T2
-import uk.gov.homeoffice.drt.time.SDate
+import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
 
-class MinutesOffScheduledMock extends FlightValueExtractionActor(T2, 2020, 10, 1, minutesOffSchedule) {
+class MinutesOffScheduledMock extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule) {
   byKey = Map(ArrivalKey(0L, "T2", 1) -> ((2d, Seq("a", "b")), "MMM"))
 }
 

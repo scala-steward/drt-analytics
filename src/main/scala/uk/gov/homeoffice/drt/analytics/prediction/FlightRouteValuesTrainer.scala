@@ -11,11 +11,12 @@ import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructTy
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, RegressionModelFromSpark}
-import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.{ModelExamplesProvider, ModelUpdateService}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.FlightRoute
+import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
 import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.prediction.Feature
 import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.{Feature, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,14 +24,13 @@ import scala.jdk.CollectionConverters.seqAsJavaListConverter
 
 object FlightRouteValuesTrainer {
   type ModelExamplesProvider[MI] = (Terminal, SDateLike, Int) => Source[(MI, Iterable[(Double, Seq[String])]), NotUsed]
-  type ModelUpdateService[MI] = (MI, Option[ModelUpdate]) => Future[_]
 }
 
-case class FlightRouteValuesTrainer[MI](targetName: String,
-                                        examplesProvider: ModelExamplesProvider[MI],
-                                        updateService: ModelUpdateService[MI],
-                                        baselineValue: Double,
-                                       ) {
+case class FlightRouteValuesTrainer(modelName: String,
+                                    examplesProvider: ModelExamplesProvider[FlightRoute],
+                                    persistence: Persistence[FlightRoute],
+                                    baselineValue: Double,
+                                   ) {
   private val log = LoggerFactory.getLogger(getClass)
 
   def trainTerminals(terminals: List[Terminal])
@@ -73,7 +73,7 @@ case class FlightRouteValuesTrainer[MI](targetName: String,
           val dataFrame = prepareDataFrame(featureColumnNames, withIndex)
           removeOutliers(dataFrame) match {
             case examples if examples.count() <= 5 =>
-              updateService(modelIdentifier, None)
+              persistence.updateModel(modelIdentifier, modelName, None)
               None
             case withoutOutliers =>
               val trainingExamples = (allExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
@@ -81,8 +81,8 @@ case class FlightRouteValuesTrainer[MI](targetName: String,
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
               val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct, baselineValue)
               val regressionModel = RegressionModelFromSpark(lrModel)
-              val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, targetName)
-              updateService(modelIdentifier, Option(modelUpdate))
+              val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
+              persistence.updateModel(modelIdentifier, modelName, Option(modelUpdate))
               Some(improvementPct)
           }
       }

@@ -4,12 +4,12 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v342"
+lazy val drtLib = "v346"
 
 lazy val akkaHttpVersion = "10.1.9"
 lazy val akkaVersion = "2.6.20"
 lazy val akkaPersistenceJdbcVersion = "3.5.0"
-lazy val akkaPersistenceInMemoryVersion = "2.4.18.1"
+lazy val akkaPersistenceInMemoryVersion = "2.5.15.2"
 lazy val postgresVersion = "42.2.2"
 lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"

@@ -8,19 +8,18 @@ import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
+import uk.gov.homeoffice.drt.time.UtcDate
 
 import scala.util.Try
 
 
 class FlightValueExtractionActor(val terminal: Terminal,
-                                 val year: Int,
-                                 val month: Int,
-                                 val day: Int,
+                                 val date: UtcDate,
                                  val extractValues: FlightWithSplitsMessage => Option[(Double, Seq[String])],
                                 ) extends TerminalDateActor with PersistentActor {
   private val log = LoggerFactory.getLogger(getClass)
 
-  override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-$year-$month%02d-$day%02d"
+  override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
 
   var byKey: Map[ArrivalKey, ((Double, Seq[String]), String)] = Map()
   var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, (Double, Seq[String])] = Map()

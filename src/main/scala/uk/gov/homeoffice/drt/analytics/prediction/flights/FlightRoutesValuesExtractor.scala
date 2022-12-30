@@ -9,26 +9,26 @@ import uk.gov.homeoffice.drt.actor.TerminalDateActor
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKeyWithOrigin, FlightRoute, GetState}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
-import uk.gov.homeoffice.drt.time.SDateLike
+import uk.gov.homeoffice.drt.time.{SDateLike, UtcDate}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 case class FlightRoutesValuesExtractor[T <: TerminalDateActor](actorClass: Class[T],
-                                                               extractValues: FlightWithSplitsMessage => Option[(Double, Seq[String])],
+                                                               extractValues: FlightWithSplitsMessage => Option[(Double, Seq[String])])
+                                                              (implicit system: ActorSystem,
+                                                               ec: ExecutionContext,
+                                                               timeout: Timeout
                                                               ) {
-
-  def extractedValueByFlightRoute(terminal: Terminal, startDate: SDateLike, numberOfDays: Int)
-                                 (implicit system: ActorSystem,
-                                  ec: ExecutionContext,
-                                  timeout: Timeout
-                                 ): Source[(FlightRoute, Iterable[(Double, Seq[String])]), NotUsed] =
-    Source(((-1 * numberOfDays) until 0).toList)
-      .mapAsync(1)(day => arrivalsWithExtractedValueForDate(terminal, startDate.addDays(day)))
-      .map(byTerminalFlightNumberAndOrigin)
-      .fold(Map[FlightRoute, Iterable[(Double, Seq[String])]]()) {
-        case (acc, incoming) => addByTerminalAndFlightNumber(acc, incoming)
-      }
-      .mapConcat(identity)
+  val extractedValueByFlightRoute: (Terminal, SDateLike, Int) => Source[(FlightRoute, Iterable[(Double, Seq[String])]), NotUsed] =
+    (terminal, startDate, numberOfDays) => {
+      Source(((-1 * numberOfDays) until 0).toList)
+        .mapAsync(1)(day => arrivalsWithExtractedValueForDate(terminal, startDate.addDays(day).toUtcDate))
+        .map(byTerminalFlightNumberAndOrigin)
+        .fold(Map[FlightRoute, Iterable[(Double, Seq[String])]]()) {
+          case (acc, incoming) => addByTerminalAndFlightNumber(acc, incoming)
+        }
+        .mapConcat(identity)
+    }
 
   private def addByTerminalAndFlightNumber(acc: Map[FlightRoute, Iterable[(Double, Seq[String])]],
                                            incoming: Map[FlightRoute, Iterable[(Double, Seq[String])]],
@@ -47,12 +47,12 @@ case class FlightRoutesValuesExtractor[T <: TerminalDateActor](actorClass: Class
           (FlightRoute(terminal, number, origin), byArrivalKey.values)
       }
 
-  private def arrivalsWithExtractedValueForDate(terminal: Terminal, currentDay: SDateLike)
+  private def arrivalsWithExtractedValueForDate(terminal: Terminal, date: UtcDate)
                                                (implicit system: ActorSystem,
                                                 ec: ExecutionContext,
                                                 timeout: Timeout
                                                ): Future[Map[ArrivalKeyWithOrigin, (Double, Seq[String])]] = {
-    val actor = system.actorOf(Props(actorClass, terminal, currentDay.getFullYear, currentDay.getMonth, currentDay.getDate, extractValues))
+    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues))
     actor
       .ask(GetState).mapTo[Map[ArrivalKeyWithOrigin, (Double, Seq[String])]]
       .map { arrivals =>
