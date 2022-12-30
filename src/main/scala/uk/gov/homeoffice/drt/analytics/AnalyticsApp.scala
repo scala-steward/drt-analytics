@@ -5,14 +5,15 @@ import akka.actor.ActorSystem
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
+import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.{minutesOffSchedule, minutesToChox}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightRoutesValuesExtractor, FlightValueExtractionActor}
-import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, FlightsMessageValueExtractor}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
-import uk.gov.homeoffice.drt.prediction.TouchdownModelAndFeatures
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
+import uk.gov.homeoffice.drt.prediction.{OffScheduleModelAndFeatures, ToChoxModelAndFeatures}
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
 
 import scala.concurrent.duration._
@@ -43,11 +44,11 @@ object AnalyticsApp extends App {
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
         case "update-touchdown-models" =>
-          trainModels(portConfig.terminals, FlightsMessageValueExtractor.minutesOffSchedule, baselineValue = 0d)
+          trainModels(OffScheduleModelAndFeatures.targetName, portConfig.terminals, minutesOffSchedule, baselineValue = 0d)
 
         case "update-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-          trainModels(portConfig.terminals, FlightsMessageValueExtractor.minutesToChox, baselineTimeToChox)
+          trainModels(ToChoxModelAndFeatures.targetName, portConfig.terminals, minutesToChox, baselineTimeToChox)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
@@ -58,13 +59,15 @@ object AnalyticsApp extends App {
       System.exit(0)
   }
 
-  private def trainModels(terminals: Iterable[Terminal],
+  private def trainModels(modelName: String,
+                          terminals: Iterable[Terminal],
                           featuresFromMessage: FlightWithSplitsMessage => Option[(Double, Seq[String])],
                           baselineValue: Double): Future[Done] = {
-    val examplesProvider = FlightRoutesValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage).extractedValueByFlightRoute
+    val examplesProvider = FlightRoutesValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage)
+      .extractedValueByFlightRoute
     val persistence = Flight()
 
-    FlightRouteValuesTrainer(TouchdownModelAndFeatures.targetName, examplesProvider, persistence, baselineValue)
+    FlightRouteValuesTrainer(modelName, examplesProvider, persistence, baselineValue)
       .trainTerminals(terminals.toList)
   }
 }
