@@ -43,10 +43,10 @@ object AnalyticsApp extends App {
         case "update-pax-counts" =>
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
-        case "update-touchdown-models" =>
+        case "update-off-schedule-models" =>
           trainModels(OffScheduleModelAndFeatures.targetName, portConfig.terminals, minutesOffSchedule, baselineValue = 0d)
 
-        case "update-chox-models" =>
+        case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
           trainModels(ToChoxModelAndFeatures.targetName, portConfig.terminals, minutesToChox, baselineTimeToChox)
 
