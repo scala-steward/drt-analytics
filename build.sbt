@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
   "com.github.dnvriend" %% "akka-persistence-inmemory" % akkaPersistenceInMemoryVersion % "test",
-  "com.github.dnvriend" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
+  "com.lightbend.akka" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
   "org.postgresql" % "postgresql" % postgresVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
