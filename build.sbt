@@ -4,16 +4,17 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
+lazy val drtLib = "v355"
+
 lazy val akkaHttpVersion = "10.1.9"
-lazy val akkaVersion = "2.6.18"
-lazy val akkaPersistenceJdbcVersion = "3.5.0"
-lazy val akkaPersistenceInMemoryVersion = "2.4.18.1"
+lazy val akkaVersion = "2.7.0"
+lazy val akkaPersistenceJdbcVersion = "5.2.0"
+lazy val akkaPersistenceInMemoryVersion = "2.5.15.2"
 lazy val postgresVersion = "42.2.2"
 lazy val jodaTimeVersion = "2.9.4"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.12.0"
 lazy val specs2Version = "4.6.0"
-lazy val drtLib = "v192"
 lazy val sparkVersion = "3.2.0"
 lazy val scalaTestVersion = "3.2.9"
 
@@ -32,7 +33,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
   "com.github.dnvriend" %% "akka-persistence-inmemory" % akkaPersistenceInMemoryVersion % "test",
-  "com.github.dnvriend" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
+  "com.lightbend.akka" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
   "org.postgresql" % "postgresql" % postgresVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,

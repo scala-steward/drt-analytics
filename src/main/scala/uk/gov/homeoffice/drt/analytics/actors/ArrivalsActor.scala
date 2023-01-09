@@ -4,22 +4,22 @@ import akka.actor.Props
 import akka.persistence._
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
-import uk.gov.homeoffice.drt.analytics.{Arrivals, SimpleArrival}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.analytics.{Arrivals, SimpleArrival}
 import uk.gov.homeoffice.drt.arrivals.UniqueArrival
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.collection.mutable
 
-case class GetArrivals(firstDay: SDate, lastDay: SDate)
+case class GetArrivals(firstDay: SDateLike, lastDay: SDateLike)
 
 object ArrivalsActor {
-  def props: (String, SDate) => Props = (persistenceId: String, pointInTime: SDate) =>
+  def props: (String, SDateLike) => Props = (persistenceId: String, pointInTime: SDateLike) =>
     Props(new ArrivalsActor(persistenceId, pointInTime))
 }
 
-class ArrivalsActor(val persistenceId: String, pointInTime: SDate) extends PersistentActor {
+class ArrivalsActor(val persistenceId: String, pointInTime: SDateLike) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)
 
   var arrivals: mutable.Map[UniqueArrival, SimpleArrival] = mutable.Map()

@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics
 
 import org.specs2.mutable.Specification
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.time.SDate
 
 class OriginPaxNosSpec extends Specification {
   private val day20200314: Long = SDate("2020-03-14").millisSinceEpoch

@@ -12,7 +12,6 @@ case class DataSet(df: DataFrame, features: List[Feature]) {
   val dfIndexed: DataFrame = df.withColumn("_index", monotonically_increasing_id())
 
   val numRows: Long = dfIndexed.count()
-
   val oneToManyFeatureValues: IndexedSeq[String] = features.flatMap {
     case _: Single => Iterable()
     case OneToMany(columnNames, featurePrefix) =>
@@ -41,7 +40,7 @@ case class DataSet(df: DataFrame, features: List[Feature]) {
       .sort(col("index"))
 
   private def prepareDataFrame(labelColName: String, takePercentage: Int, sortAscending: Boolean)
-                      (implicit session: SparkSession): DataFrame = {
+                              (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
     val labelAndFeatures: immutable.Seq[Column] = FeatureVectors.labelAndFeatureCols(df.columns, labelColName, features)

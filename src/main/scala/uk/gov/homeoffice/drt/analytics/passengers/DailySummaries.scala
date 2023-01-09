@@ -6,9 +6,9 @@ import akka.util.Timeout
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.{ArrivalsActor, FeedPersistenceIds, GetArrivals}
-import uk.gov.homeoffice.drt.analytics.time.SDate
 import uk.gov.homeoffice.drt.analytics.{Arrivals, DailyPaxCountsOnDay, SimpleArrival}
 import uk.gov.homeoffice.drt.arrivals.UniqueArrival
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,9 +17,9 @@ object DailySummaries {
   val log: Logger = LoggerFactory.getLogger(getClass)
 
   def arrivalsForSources(sourcePersistenceIds: List[String],
-                         date: SDate,
-                         lastDate: SDate,
-                         actorProps: (String, SDate) => Props)
+                         date: SDateLike,
+                         lastDate: SDateLike,
+                         actorProps: (String, SDateLike) => Props)
                         (implicit ec: ExecutionContext,
                          system: ActorSystem): Seq[Future[(String, Arrivals)]] = sourcePersistenceIds
     .map { source =>
@@ -53,8 +53,8 @@ object DailySummaries {
       }
     }
 
-  def dailyPaxCountsForDayByOrigin(date: SDate,
-                                   startDate: SDate,
+  def dailyPaxCountsForDayByOrigin(date: SDateLike,
+                                   startDate: SDateLike,
                                    numberOfDays: Int,
                                    terminal: String,
                                    eventualArrivals: Future[Map[UniqueArrival, SimpleArrival]])
@@ -88,8 +88,8 @@ object DailySummaries {
     }
   }
 
-  def dailyOriginCountsToCsv(date: SDate,
-                             startDate: SDate,
+  def dailyOriginCountsToCsv(date: SDateLike,
+                             startDate: SDateLike,
                              numberOfDays: Int,
                              terminal: String,
                              eventualOriginDailyPaxCounts: Future[Map[String, DailyPaxCountsOnDay]])
@@ -105,7 +105,7 @@ object DailySummaries {
     }
 
   def dailyPaxCountsForDayAndTerminalByOrigin(terminal: String,
-                                              startDate: SDate,
+                                              startDate: SDateLike,
                                               numberOfDays: Int,
                                               sourcesInOrder: List[String],
                                               dayOffset: Int)
@@ -119,7 +119,7 @@ object DailySummaries {
   }
 
   def toCsv(terminal: String,
-            startDate: SDate,
+            startDate: SDateLike,
             numberOfDays: Int,
             sourcesInOrder: List[String],
             dayOffset: Int)(implicit ec: ExecutionContext, system: ActorSystem): Future[String] = {
