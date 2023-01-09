@@ -41,7 +41,7 @@ case class FlightRouteValuesTrainer(modelName: String,
       }
       .runWith(Sink.ignore)
 
-  def logStats(terminal: Terminal, result: Seq[Option[Double]]): Unit = {
+  private def logStats(terminal: Terminal, result: Seq[Option[Double]]): Unit = {
     val total = result.size
     val modelCount = result.count(_.isDefined)
     val threshold = 10
@@ -49,8 +49,8 @@ case class FlightRouteValuesTrainer(modelName: String,
     log.info(s"Terminal ${terminal.toString}: $total total, $modelCount models, $improvementsOverThreshold >= $threshold% improvement")
   }
 
-  def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
-           (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Seq[Option[Double]]] = {
+  private def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
+                   (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Seq[Option[Double]]] = {
     implicit val session: SparkSession = SparkSession
       .builder
       .appName("DRT Analytics")
@@ -146,6 +146,6 @@ case class FlightRouteValuesTrainer(modelName: String,
     val iqr = q3 - q1
     val lowerRange = q1 - 1.5 * iqr
     val upperRange = q3 + 1.5 * iqr
-    dataFrame.filter(s"$lowerRange < label and label < $upperRange")
+    dataFrame.filter(s"$lowerRange <= label and label <= $upperRange")
   }
 }
