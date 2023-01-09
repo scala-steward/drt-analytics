@@ -30,6 +30,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                                     examplesProvider: ModelExamplesProvider[FlightRoute],
                                     persistence: Persistence[FlightRoute],
                                     baselineValue: Double,
+                                    daysOfTrainingData: Int,
                                    ) {
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -37,7 +38,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                     (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
     Source(terminals)
       .mapAsync(1) { terminal =>
-        train(150, 20, terminal).map(r => logStats(terminal, r))
+        train(daysOfTrainingData, 20, terminal).map(r => logStats(terminal, r))
       }
       .runWith(Sink.ignore)
 

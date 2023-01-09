@@ -30,6 +30,9 @@ object AnalyticsApp extends App {
 
   val portCode = PortCode(config.getString("port-code").toUpperCase)
   val daysToLookBack = config.getInt("days-to-look-back")
+  val daysOfTrainingData = config.getInt("options.training.days-of-data")
+
+  println(s"Training on $daysOfTrainingData days of data")
 
   AirportConfigs.confByPort.get(portCode) match {
     case None =>
@@ -67,7 +70,7 @@ object AnalyticsApp extends App {
       .extractedValueByFlightRoute
     val persistence = Flight()
 
-    FlightRouteValuesTrainer(modelName, examplesProvider, persistence, baselineValue)
+    FlightRouteValuesTrainer(modelName, examplesProvider, persistence, baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
   }
 }
