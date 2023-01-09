@@ -3,9 +3,10 @@ package uk.gov.homeoffice.drt.analytics.prediction
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.pattern.StatusReply.Ack
 import akka.stream.scaladsl.Source
-import akka.testkit.TestProbe
+import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel}
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{FlightRoute, GetState}
 import uk.gov.homeoffice.drt.ports.Terminals.T2
@@ -13,8 +14,8 @@ import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 case class MockPersistenceActor(probe: ActorRef) extends Actor {
   override def receive: Receive = {
@@ -38,13 +39,20 @@ case class MockPersistence(probe: ActorRef)
   override val now: () => SDateLike = () => SDate("2023-01-01T00:00")
 }
 
-class FlightRouteValuesTrainerSpec extends AnyWordSpec {
-  implicit val system: ActorSystem = ActorSystem("flight-route-values-trainer-spec")
+class FlightRouteValuesTrainerSpec
+  extends TestKit(ActorSystem("FlightRouteValuesTrainer"))
+    with AnyWordSpecLike with BeforeAndAfterAll {
+
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   implicit val timeout: Timeout = new Timeout(1.second)
 
+  override def afterAll(): Unit = {
+    TestKit.shutdownActorSystem(system)
+  }
+
   "FlightRouteValuesTrainer" should {
     val example = (1.0, Seq("dow_1", "pod_1"))
+
     def examples(n: Int): Iterable[(Double, Seq[String])] = Iterable.fill(n)(example)
 
     "Send a RemoveModel when there are too few training examples" in {
