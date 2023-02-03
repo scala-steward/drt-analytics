@@ -43,13 +43,13 @@ object DailySummaries {
         case (arrivalsSoFar, source) =>
           val supplementalArrivals = sourcesWithArrivals.toMap.getOrElse(source, Arrivals(Map())).arrivals
           log.info(s"Applying ${supplementalArrivals.size} $source to ${arrivalsSoFar.size} existing arrivals")
-          arrivalsSoFar.mapValues { arrival =>
+          arrivalsSoFar.view.mapValues { arrival =>
             supplementalArrivals.get(arrival.uniqueArrival) match {
               case Some(suppArr) if suppArr.actPax > 0 =>
                 arrival.copy(actPax = suppArr.actPax, transPax = suppArr.transPax)
               case _ => arrival
             }
-          }
+          }.toMap
       }
     }
 

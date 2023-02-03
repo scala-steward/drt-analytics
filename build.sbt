@@ -1,22 +1,22 @@
 
-ThisBuild / scalaVersion := "2.12.15"
+ThisBuild / scalaVersion := "2.13.10"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v355"
+lazy val drtLib = "v363"
 
-lazy val akkaHttpVersion = "10.1.9"
+lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
 lazy val akkaPersistenceJdbcVersion = "5.2.0"
 lazy val akkaPersistenceInMemoryVersion = "2.5.15.2"
-lazy val postgresVersion = "42.2.2"
-lazy val jodaTimeVersion = "2.9.4"
+lazy val postgresVersion = "42.5.2"
+lazy val jodaTimeVersion = "2.12.2"
 lazy val logbackContribVersion = "0.1.5"
-lazy val jacksonDatabindVersion = "2.12.0"
-lazy val specs2Version = "4.6.0"
-lazy val sparkVersion = "3.2.0"
-lazy val scalaTestVersion = "3.2.9"
+lazy val jacksonDatabindVersion = "2.13.5"
+lazy val specs2Version = "4.19.2"
+lazy val sparkVersion = "3.3.1"
+lazy val scalaTestVersion = "3.2.15"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
