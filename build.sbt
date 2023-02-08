@@ -50,6 +50,8 @@ lazy val root = (project in file("."))
     resolvers += "Artifactory Realm release local" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
 
+    dockerBaseImage := "openjdk:11-jre-slim-buster",
+
     Global / concurrentRestrictions += Tags.limit(Tags.Test, 1)
 
   )
