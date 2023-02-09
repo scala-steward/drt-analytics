@@ -20,7 +20,7 @@ import uk.gov.homeoffice.drt.prediction.{Feature, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.seqAsJavaListConverter
+import scala.jdk.CollectionConverters.SeqHasAsJava
 
 object FlightRouteValuesTrainer {
   type ModelExamplesProvider[MI] = (Terminal, SDateLike, Int) => Source[(MI, Iterable[(Double, Seq[String])]), NotUsed]
