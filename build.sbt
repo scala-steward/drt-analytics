@@ -56,4 +56,4 @@ lazy val root = (project in file("."))
 
   )
   .enablePlugins(DockerPlugin)
-  .enablePlugins(AshScriptPlugin)
+  .enablePlugins(JavaAppPackaging)
