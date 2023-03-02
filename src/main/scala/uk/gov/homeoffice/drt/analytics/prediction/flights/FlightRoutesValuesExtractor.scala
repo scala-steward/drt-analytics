@@ -5,6 +5,7 @@ import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.pattern.ask
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
+import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKeyWithOrigin, FlightRoute, GetState}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
@@ -19,6 +20,8 @@ case class FlightRoutesValuesExtractor[T <: TerminalDateActor](actorClass: Class
                                                                ec: ExecutionContext,
                                                                timeout: Timeout
                                                               ) {
+  private val log = LoggerFactory.getLogger(getClass)
+
   val extractedValueByFlightRoute: (Terminal, SDateLike, Int) => Source[(FlightRoute, Iterable[(Double, Seq[String])]), NotUsed] =
     (terminal, startDate, numberOfDays) => {
       Source(((-1 * numberOfDays) until 0).toList)
@@ -58,6 +61,12 @@ case class FlightRoutesValuesExtractor[T <: TerminalDateActor](actorClass: Class
       .map { arrivals =>
         actor ! PoisonPill
         arrivals
+      }
+      .recoverWith {
+        case t: Throwable =>
+          log.error(s"Failed to get arrivals for $terminal $date", t.getMessage)
+          actor ! PoisonPill
+          Future.failed(t)
       }
   }
 }

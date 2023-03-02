@@ -4,7 +4,7 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v363"
+lazy val drtLib = "v388"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
@@ -15,7 +15,7 @@ lazy val jodaTimeVersion = "2.12.2"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.13.5"
 lazy val specs2Version = "4.19.2"
-lazy val sparkVersion = "3.3.1"
+lazy val sparkVersion = "3.3.2"
 lazy val scalaTestVersion = "3.2.15"
 
 libraryDependencies ++= Seq(

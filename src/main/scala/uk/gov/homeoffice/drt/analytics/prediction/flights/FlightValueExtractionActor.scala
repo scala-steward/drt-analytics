@@ -24,7 +24,7 @@ class FlightValueExtractionActor(val terminal: Terminal,
   var byKey: Map[ArrivalKey, ((Double, Seq[String]), String)] = Map()
   var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, (Double, Seq[String])] = Map()
 
-  def parseFlightNumber(code: String): Option[Int] = {
+  private def parseFlightNumber(code: String): Option[Int] = {
     code match {
       case Arrival.flightCodeRegex(_, flightNumber, _) => Try(flightNumber.toInt).toOption
       case _ => None

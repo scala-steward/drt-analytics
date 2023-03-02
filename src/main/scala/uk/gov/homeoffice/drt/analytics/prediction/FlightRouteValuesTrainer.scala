@@ -38,6 +38,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                     (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
     Source(terminals)
       .mapAsync(1) { terminal =>
+        log.info(s"Training $modelName for $terminal")
         train(daysOfTrainingData, 20, terminal).map(r => logStats(terminal, r))
       }
       .runWith(Sink.ignore)
@@ -51,7 +52,7 @@ case class FlightRouteValuesTrainer(modelName: String,
   }
 
   private def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
-                   (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Seq[Option[Double]]] = {
+                   (implicit mat: Materializer): Future[Seq[Option[Double]]] = {
     implicit val session: SparkSession = SparkSession
       .builder
       .appName("DRT Analytics")
@@ -67,6 +68,8 @@ case class FlightRouteValuesTrainer(modelName: String,
 
     val trainingSetPct = 100 - validationSetPct
 
+    log.info(s"Training $modelName for $terminal with $daysOfData days of data, $trainingSetPct% training, $validationSetPct% validation")
+
     examplesProvider(terminal, start, daysOfData)
       .map {
         case (modelIdentifier, allExamples) =>
@@ -77,6 +80,7 @@ case class FlightRouteValuesTrainer(modelName: String,
               persistence.updateModel(modelIdentifier, modelName, None)
               None
             case withoutOutliers =>
+              log.info(s"Training $modelName for $modelIdentifier with ${withoutOutliers.count()} out of ${allExamples.size} examples after outlier removal")
               val trainingExamples = (allExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
               val dataSet = DataSet(withoutOutliers, features)
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)

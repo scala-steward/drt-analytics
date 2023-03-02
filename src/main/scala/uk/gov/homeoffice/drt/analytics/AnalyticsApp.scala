@@ -5,15 +5,16 @@ import akka.actor.ActorSystem
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.actor.WalkTimeProvider
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
-import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.{minutesOffSchedule, minutesToChox}
+import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.{minutesOffSchedule, minutesToChox, walkTimeMinutes}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightRoutesValuesExtractor, FlightValueExtractionActor}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
-import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
+import uk.gov.homeoffice.drt.prediction.arrival.{OffScheduleModelAndFeatures, ToChoxModelAndFeatures, WalkTimeModelAndFeatures}
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
-import uk.gov.homeoffice.drt.prediction.{OffScheduleModelAndFeatures, ToChoxModelAndFeatures}
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
 
 import scala.concurrent.duration._
@@ -52,6 +53,14 @@ object AnalyticsApp extends App {
         case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
           trainModels(ToChoxModelAndFeatures.targetName, portConfig.terminals, minutesToChox, baselineTimeToChox)
+
+        case "update-walk-time-models" =>
+          /** fix!! - hard coded terminal */
+          val baselineWalkTime = portConfig.defaultWalkTimeMillis(T1) / 60000
+          println(s"Baseline walk time is $baselineWalkTime minutes")
+          val provider = WalkTimeProvider(config.getString("options.walk-time-file-path"))
+          log.info(s"Loaded ${provider.walkTimes.size} walk times from ${config.getString("options.walk-time-file-path")}")
+          trainModels(WalkTimeModelAndFeatures.targetName, portConfig.terminals, walkTimeMinutes(provider), baselineWalkTime)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
