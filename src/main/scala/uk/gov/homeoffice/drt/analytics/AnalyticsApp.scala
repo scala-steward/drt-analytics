@@ -48,19 +48,17 @@ object AnalyticsApp extends App {
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
         case "update-off-schedule-models" =>
-          trainModels(OffScheduleModelAndFeatures.targetName, portConfig.terminals, minutesOffSchedule, baselineValue = 0d)
+          trainModels(OffScheduleModelAndFeatures.targetName, portConfig.terminals, minutesOffSchedule, baselineValue = _ => 0d)
 
         case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-          trainModels(ToChoxModelAndFeatures.targetName, portConfig.terminals, minutesToChox, baselineTimeToChox)
+          trainModels(ToChoxModelAndFeatures.targetName, portConfig.terminals, minutesToChox, _ => baselineTimeToChox)
 
         case "update-walk-time-models" =>
-          /** fix!! - hard coded terminal */
-          val baselineWalkTime = portConfig.defaultWalkTimeMillis(T1) / 60000
-          println(s"Baseline walk time is $baselineWalkTime minutes")
+          val baselineWalkTimeSeconds: Terminal => Double = (t: Terminal) => portConfig.defaultWalkTimeMillis.get(t).map(_.toDouble / 1000).getOrElse(0)
           val provider = WalkTimeProvider(config.getString("options.walk-time-file-path"))
           log.info(s"Loaded ${provider.walkTimes.size} walk times from ${config.getString("options.walk-time-file-path")}")
-          trainModels(WalkTimeModelAndFeatures.targetName, portConfig.terminals, walkTimeMinutes(provider), baselineWalkTime)
+          trainModels(WalkTimeModelAndFeatures.targetName, portConfig.terminals, walkTimeMinutes(provider), baselineWalkTimeSeconds)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
@@ -74,7 +72,7 @@ object AnalyticsApp extends App {
   private def trainModels(modelName: String,
                           terminals: Iterable[Terminal],
                           featuresFromMessage: FlightWithSplitsMessage => Option[(Double, Seq[String])],
-                          baselineValue: Double): Future[Done] = {
+                          baselineValue: Terminal => Double): Future[Done] = {
     val examplesProvider = FlightRoutesValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage)
       .extractedValueByFlightRoute
     val persistence = Flight()

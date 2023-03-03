@@ -75,7 +75,7 @@ class FlightRouteValuesTrainerSpec
         Source(List((FlightRoute("T2", 1, "JFK"), examples)))
       },
       MockPersistence(probe),
-      1000d,
+      _ => 1000d,
       10
     )
   }

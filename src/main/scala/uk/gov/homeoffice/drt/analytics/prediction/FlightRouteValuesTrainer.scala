@@ -1,9 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
-import akka.util.Timeout
 import akka.{Done, NotUsed}
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
@@ -29,13 +27,13 @@ object FlightRouteValuesTrainer {
 case class FlightRouteValuesTrainer(modelName: String,
                                     examplesProvider: ModelExamplesProvider[FlightRoute],
                                     persistence: Persistence[FlightRoute],
-                                    baselineValue: Double,
+                                    baselineValue: Terminal => Double,
                                     daysOfTrainingData: Int,
                                    ) {
   private val log = LoggerFactory.getLogger(getClass)
 
   def trainTerminals(terminals: List[Terminal])
-                    (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] =
+                    (implicit ec: ExecutionContext, mat: Materializer): Future[Done] =
     Source(terminals)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
@@ -84,7 +82,7 @@ case class FlightRouteValuesTrainer(modelName: String,
               val trainingExamples = (allExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
               val dataSet = DataSet(withoutOutliers, features)
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
-              val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct, baselineValue)
+              val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct, baselineValue(terminal))
               val regressionModel = RegressionModelFromSpark(lrModel)
               val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
               persistence.updateModel(modelIdentifier, modelName, Option(modelUpdate))
