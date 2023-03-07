@@ -8,7 +8,7 @@ import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{FlightRoute, GetState}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.{FlightRoute, GetState, WithId}
 import uk.gov.homeoffice.drt.ports.Terminals.T2
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
@@ -32,9 +32,9 @@ case class MockPersistenceActor(probe: ActorRef) extends Actor {
 case class MockPersistence(probe: ActorRef)
                           (implicit
                            val system: ActorSystem, val ec: ExecutionContext, val timeout: Timeout
-                          ) extends Persistence[FlightRoute] {
+                          ) extends Persistence {
   override val modelCategory: ModelCategory = FlightCategory
-  override val actorProvider: (ModelCategory, FlightRoute) => ActorRef =
+  override val actorProvider: (ModelCategory, WithId) => ActorRef =
     (_, _) => system.actorOf(Props(MockPersistenceActor(probe)), s"test-actor")
   override val now: () => SDateLike = () => SDate("2023-01-01T00:00")
 }

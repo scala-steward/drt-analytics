@@ -9,7 +9,7 @@ import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructTy
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, RegressionModelFromSpark}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.FlightRoute
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.WithId
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
 import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
@@ -25,8 +25,8 @@ object FlightRouteValuesTrainer {
 }
 
 case class FlightRouteValuesTrainer(modelName: String,
-                                    examplesProvider: ModelExamplesProvider[FlightRoute],
-                                    persistence: Persistence[FlightRoute],
+                                    examplesProvider: ModelExamplesProvider[WithId],
+                                    persistence: Persistence,
                                     baselineValue: Terminal => Double,
                                     daysOfTrainingData: Int,
                                    ) {

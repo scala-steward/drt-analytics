@@ -1,21 +1,25 @@
 package uk.gov.homeoffice.drt.analytics
 
-import akka.Done
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.Source
 import akka.util.Timeout
+import akka.{Done, NotUsed}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.WithId
 import uk.gov.homeoffice.drt.actor.WalkTimeProvider
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
 import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.{minutesOffSchedule, minutesToChox, walkTimeMinutes}
-import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightRoutesValuesExtractor, FlightValueExtractionActor}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, FlightValuesExtractor}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.aggregation.{RouteAggregator, TerminalCarrierOriginAggregator}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
-import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
+import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 import uk.gov.homeoffice.drt.prediction.arrival.{OffScheduleModelAndFeatures, ToChoxModelAndFeatures, WalkTimeModelAndFeatures}
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
+import uk.gov.homeoffice.drt.time.SDateLike
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -48,17 +52,37 @@ object AnalyticsApp extends App {
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
         case "update-off-schedule-models" =>
-          trainModels(OffScheduleModelAndFeatures.targetName, portConfig.terminals, minutesOffSchedule, baselineValue = _ => 0d)
+          trainModels(
+            OffScheduleModelAndFeatures.targetName,
+            portConfig.terminals,
+            minutesOffSchedule,
+            RouteAggregator.aggregateKey,
+            baselineValue = _ => 0d)
 
         case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-          trainModels(ToChoxModelAndFeatures.targetName, portConfig.terminals, minutesToChox, _ => baselineTimeToChox)
+          trainModels(
+            ToChoxModelAndFeatures.targetName,
+            portConfig.terminals,
+            minutesToChox,
+            RouteAggregator.aggregateKey,
+            _ => baselineTimeToChox)
 
         case "update-walk-time-models" =>
           val baselineWalkTimeSeconds: Terminal => Double = (t: Terminal) => portConfig.defaultWalkTimeMillis.get(t).map(_.toDouble / 1000).getOrElse(0)
-          val provider = WalkTimeProvider(config.getString("options.walk-time-file-path"))
-          log.info(s"Loaded ${provider.walkTimes.size} walk times from ${config.getString("options.walk-time-file-path")}")
-          trainModels(WalkTimeModelAndFeatures.targetName, portConfig.terminals, walkTimeMinutes(provider), baselineWalkTimeSeconds)
+          val gatesPath = config.getString("options.gates-walk-time-file-path")
+          val maybeGatesFile = if (gatesPath.nonEmpty) Option(gatesPath) else None
+          val standsPath = config.getString("options.stands-walk-time-file-path")
+          val maybeStandsFile = if (standsPath.nonEmpty) Option(standsPath) else None
+          val provider = WalkTimeProvider(maybeGatesFile, maybeStandsFile)
+
+          log.info(s"Loaded walk times from $maybeGatesFile and $maybeStandsFile")
+          trainModels(
+            WalkTimeModelAndFeatures.targetName,
+            portConfig.terminals,
+            walkTimeMinutes(provider),
+            TerminalCarrierOriginAggregator.aggregateKey,
+            baselineWalkTimeSeconds)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
@@ -72,9 +96,11 @@ object AnalyticsApp extends App {
   private def trainModels(modelName: String,
                           terminals: Iterable[Terminal],
                           featuresFromMessage: FlightWithSplitsMessage => Option[(Double, Seq[String])],
+                          keyFromMessage: FlightWithSplitsMessage => Option[WithId],
                           baselineValue: Terminal => Double): Future[Done] = {
-    val examplesProvider = FlightRoutesValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage)
-      .extractedValueByFlightRoute
+    val examplesProvider: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String])]), NotUsed] =
+      FlightValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage, keyFromMessage)
+        .extractedValueByFlightRoute
     val persistence = Flight()
 
     FlightRouteValuesTrainer(modelName, examplesProvider, persistence, baselineValue, daysOfTrainingData)
