@@ -7,8 +7,8 @@ import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
-import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{FlightRoute, GetState, WithId}
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel, TerminalFlightNumberOrigin, WithId}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
 import uk.gov.homeoffice.drt.ports.Terminals.T2
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
@@ -72,7 +72,7 @@ class FlightRouteValuesTrainerSpec
     FlightRouteValuesTrainer(
       "some-model",
       (_, _, _) => {
-        Source(List((FlightRoute("T2", 1, "JFK"), examples)))
+        Source(List((TerminalFlightNumberOrigin("T2", 1, "JFK"), examples)))
       },
       MockPersistence(probe),
       _ => 1000d,

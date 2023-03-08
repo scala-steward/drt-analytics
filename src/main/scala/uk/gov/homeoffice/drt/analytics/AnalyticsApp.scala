@@ -6,12 +6,11 @@ import akka.util.Timeout
 import akka.{Done, NotUsed}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.WithId
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.{TerminalCarrierOrigin, TerminalFlightNumberOrigin, WithId}
 import uk.gov.homeoffice.drt.actor.WalkTimeProvider
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
 import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.{minutesOffSchedule, minutesToChox, walkTimeMinutes}
-import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, FlightValuesExtractor}
-import uk.gov.homeoffice.drt.analytics.prediction.flights.aggregation.{RouteAggregator, TerminalCarrierOriginAggregator}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
@@ -56,7 +55,7 @@ object AnalyticsApp extends App {
             OffScheduleModelAndFeatures.targetName,
             portConfig.terminals,
             minutesOffSchedule,
-            RouteAggregator.aggregateKey,
+            TerminalFlightNumberOrigin.fromMessage,
             baselineValue = _ => 0d)
 
         case "update-to-chox-models" =>
@@ -65,7 +64,7 @@ object AnalyticsApp extends App {
             ToChoxModelAndFeatures.targetName,
             portConfig.terminals,
             minutesToChox,
-            RouteAggregator.aggregateKey,
+            TerminalFlightNumberOrigin.fromMessage,
             _ => baselineTimeToChox)
 
         case "update-walk-time-models" =>
@@ -81,7 +80,7 @@ object AnalyticsApp extends App {
             WalkTimeModelAndFeatures.targetName,
             portConfig.terminals,
             walkTimeMinutes(provider),
-            TerminalCarrierOriginAggregator.aggregateKey,
+            TerminalCarrierOrigin.fromMessage,
             baselineWalkTimeSeconds)
 
         case unknown =>
@@ -99,8 +98,7 @@ object AnalyticsApp extends App {
                           keyFromMessage: FlightWithSplitsMessage => Option[WithId],
                           baselineValue: Terminal => Double): Future[Done] = {
     val examplesProvider: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String])]), NotUsed] =
-      FlightValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage, keyFromMessage)
-        .extractedValueByFlightRoute
+      ValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage, keyFromMessage).extractValuesByKey
     val persistence = Flight()
 
     FlightRouteValuesTrainer(modelName, examplesProvider, persistence, baselineValue, daysOfTrainingData)

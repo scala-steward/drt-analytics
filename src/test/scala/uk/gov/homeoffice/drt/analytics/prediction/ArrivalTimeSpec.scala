@@ -7,11 +7,11 @@ import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.analytics.prediction.FlightWithSplitsMessageGenerator.generateFlightWithSplitsMessage
 import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.minutesOffSchedule
-import uk.gov.homeoffice.drt.analytics.prediction.flights.aggregation.RouteAggregator
-import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, FlightValuesExtractor}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.ports.Terminals.T2
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.FlightMessage
@@ -35,7 +35,7 @@ object FlightWithSplitsMessageGenerator {
 
 }
 
-class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule, RouteAggregator.aggregateKey) {
+class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule, TerminalFlightNumberOrigin.fromMessage) {
   byArrivalKey = Map(
     ArrivalKey(0L, "T2", 1) -> generateFlightWithSplitsMessage("T2", "BA0001", "LHR", scheduled.millisSinceEpoch),
   )
@@ -73,8 +73,8 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val start = scheduled.getLocalLastMidnight
             val days = 10
 
-            val arrivals = FlightValuesExtractor(classOf[FlightValueExtractionActor], minutesOffSchedule, RouteAggregator.aggregateKey)
-              .extractedValueByFlightRoute(T2, start, days)
+            val arrivals = ValuesExtractor(classOf[FlightValueExtractionActor], minutesOffSchedule, TerminalFlightNumberOrigin.fromMessage)
+              .extractValuesByKey(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)
 

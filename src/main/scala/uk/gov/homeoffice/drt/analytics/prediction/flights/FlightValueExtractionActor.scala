@@ -2,8 +2,9 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.slf4j.LoggerFactory
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState, WithId}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
