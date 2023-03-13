@@ -20,10 +20,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.SeqHasAsJava
 
 object FlightRouteValuesTrainer {
-  type ModelExamplesProvider[MI] = (Terminal, SDateLike, Int) => Source[(MI, Iterable[(Double, Seq[String])]), NotUsed]
+  type ModelExamplesProvider[MI] = (Terminal, SDateLike, Int) => Source[(MI, Iterable[(Double, Seq[String], Seq[Double])]), NotUsed]
 }
 
 case class FlightRouteValuesTrainer(modelName: String,
+                                    features: List[Feature],
                                     examplesProvider: ModelExamplesProvider[WithId],
                                     persistence: Persistence,
                                     baselineValue: Terminal => Double,
@@ -37,15 +38,23 @@ case class FlightRouteValuesTrainer(modelName: String,
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
         train(daysOfTrainingData, 20, terminal).map(r => logStats(terminal, r))
+          .recover {
+            case t =>
+              log.error(s"Failed to train $modelName for $terminal", t)
+          }
       }
       .runWith(Sink.ignore)
 
   private def logStats(terminal: Terminal, result: Seq[Option[Double]]): Unit = {
     val total = result.size
     val modelCount = result.count(_.isDefined)
-    val threshold = 10
-    val improvementsOverThreshold = result.collect { case Some(imp) if imp >= threshold => imp }.size
-    log.info(s"Terminal ${terminal.toString}: $total total, $modelCount models, $improvementsOverThreshold >= $threshold% improvement")
+    log.info(s"Terminal ${terminal.toString}: $total total, $modelCount models")
+
+    Seq(10, 20, 30, 40, 50, 60, 70, 80, 90, 100).foreach { threshold =>
+      val improvementsOverThreshold = result.collect { case Some(imp) if imp >= threshold => imp }.size
+      val pctOverThresholdTotal = (improvementsOverThreshold.toDouble / total.toDouble * 100).toInt
+      log.info(s"$pctOverThresholdTotal% >= $threshold% improvement")
+    }
   }
 
   private def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
@@ -57,10 +66,10 @@ case class FlightRouteValuesTrainer(modelName: String,
       .getOrCreate()
 
     val start = SDate.now().addDays(-1)
-    val features: List[Feature] = List(OneToMany(List("dayOfTheWeek"), "dow"), OneToMany(List("partOfDay"), "pod"))
-    val featureColumnNames: List[String] = features.flatMap {
-      case OneToMany(colNames, _) => colNames
-      case Single(colName) => List(colName)
+
+    val featureColumnNames: Seq[String] = features.flatMap {
+      case OneToMany(columns, _) => columns.map(_.label)
+      case Single(column) => List(column.label)
     }
 
     val trainingSetPct = 100 - validationSetPct
@@ -70,7 +79,7 @@ case class FlightRouteValuesTrainer(modelName: String,
     examplesProvider(terminal, start, daysOfData)
       .map {
         case (modelIdentifier, allExamples) =>
-          val withIndex: Iterable[((Double, Seq[String]), Int)] = allExamples.zipWithIndex
+          val withIndex = allExamples.zipWithIndex
           val dataFrame = prepareDataFrame(featureColumnNames, withIndex)
           removeOutliers(dataFrame) match {
             case examples if examples.count() <= 5 =>
@@ -92,7 +101,7 @@ case class FlightRouteValuesTrainer(modelName: String,
   }
 
   private def calculateImprovementPct(dataSet: DataSet,
-                                      withIndex: Iterable[((Double, Seq[String]), Int)],
+                                      withIndex: Iterable[((Double, Seq[String], Seq[Double]), Int)],
                                       model: LinearRegressionModel,
                                       validationSetPct: Int,
                                       baselineValue: Double,
@@ -104,7 +113,7 @@ case class FlightRouteValuesTrainer(modelName: String,
       .map { row =>
         val idx = row.getAs[String]("index")
         withIndex.find(_._2.toString == idx).map {
-          case ((label, _), _) =>
+          case ((label, _, _), _) =>
             val prediction = Math.round(row.getAs[Double]("prediction"))
             (label, prediction.toDouble)
         }.getOrElse((0d, 0d))
@@ -123,7 +132,7 @@ case class FlightRouteValuesTrainer(modelName: String,
     pctImprovement
   }
 
-  private def prepareDataFrame(columnNames: List[String], valuesZippedWithIndex: Iterable[((Double, Seq[String]), Int)])
+  private def prepareDataFrame(columnNames: Seq[String], valuesZippedWithIndex: Iterable[((Double, Seq[String], Seq[Double]), Int)])
                               (implicit session: SparkSession): Dataset[Row] = {
 
     val labelField = StructField("label", DoubleType, nullable = false)
@@ -135,19 +144,22 @@ case class FlightRouteValuesTrainer(modelName: String,
     val schema = StructType(labelField +: fields :+ indexField)
 
     val rows = valuesZippedWithIndex.map {
-      case ((labelValue, featureValues), idx) => Row(labelValue +: featureValues :+ idx.toString: _*)
+      case ((labelValue, oneToManyFeatureValues, singleFeatureValues), idx) => Row(labelValue +: (oneToManyFeatureValues ++ singleFeatureValues) :+ idx.toString: _*)
     }.toList.asJava
 
     session.createDataFrame(rows, schema).sort("label")
   }
 
   private def removeOutliers(dataFrame: Dataset[Row]): Dataset[Row] = {
-    val quantiles = dataFrame.stat.approxQuantile("label", Array(0.25, 0.75), 0.0)
-    val q1 = quantiles(0)
-    val q3 = quantiles(1)
-    val iqr = q3 - q1
-    val lowerRange = q1 - 1.5 * iqr
-    val upperRange = q3 + 1.5 * iqr
-    dataFrame.filter(s"$lowerRange <= label and label <= $upperRange")
+    dataFrame.stat.approxQuantile("label", Array(0.25, 0.75), 0.0) match {
+      case quantiles if quantiles.length == 2 =>
+        val q1 = quantiles(0)
+        val q3 = quantiles(1)
+        val iqr = q3 - q1
+        val lowerRange = q1 - 1.5 * iqr
+        val upperRange = q3 + 1.5 * iqr
+        dataFrame.filter(s"$lowerRange <= label and label <= $upperRange")
+      case _ => dataFrame
+    }
   }
 }

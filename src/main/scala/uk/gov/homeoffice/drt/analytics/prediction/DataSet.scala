@@ -16,7 +16,7 @@ case class DataSet(df: DataFrame, features: List[Feature]) {
     case _: Single => Iterable()
     case OneToMany(columnNames, featurePrefix) =>
       df
-        .select(concat_ws("-", columnNames.map(col): _*))
+        .select(concat_ws("-", columnNames.map(c => col(c.label)): _*))
         .rdd.distinct.collect
         .map(r => s"${featurePrefix}_${r.getAs[String](0)}")
   }.toIndexedSeq
@@ -43,7 +43,7 @@ case class DataSet(df: DataFrame, features: List[Feature]) {
                               (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
-    val labelAndFeatures: immutable.Seq[Column] = FeatureVectors.labelAndFeatureCols(df.columns, labelColName, features)
+    val labelAndFeatures: Seq[Column] = FeatureVectors.labelAndFeatureCols(df.columns, labelColName, features)
 
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 

@@ -17,13 +17,13 @@ object FeatureVectors {
     Vectors.sparse(features.oneToManyValues.size, oneToManyIndices(row, features).map(idx => (idx, 1d))).toArray
 
   def singleFeaturesVector(row: Row, features: FeaturesWithOneToManyValues): List[Double] = features.features.collect {
-    case Single(columnName) => row.getAs[Double](columnName)
+    case Single(columnName) => row.getAs[Double](columnName.label)
   }
 
   def oneToManyIndices(row: Row, features: FeaturesWithOneToManyValues): Seq[Int] =
     features.oneToManyFeatures
       .map { fs =>
-        val featureColValues = fs.columnNames.map(c => row.getAs[String](c))
+        val featureColValues = fs.columns.map(c => row.getAs[String](c.label))
         val featureString = s"${fs.featurePrefix}_${featureColValues.mkString("-")}"
         features.oneToManyValues.indexOf(featureString)
       }
@@ -32,8 +32,8 @@ object FeatureVectors {
   def labelAndFeatureCols(allColumns: Iterable[String], labelColName: String, features: List[Feature])
                          (implicit session: SparkSession): immutable.Seq[Column] = {
     val featureColumns = features.map {
-      case OneToMany(columnNames, _) => concat_ws("-", columnNames.map(col): _*)
-      case Single(columnName) => col(columnName)
+      case OneToMany(columns, _) => concat_ws("-", columns.map(c => col(c.label)): _*)
+      case Single(column) => col(column.label)
     }
     col(labelColName) :: (featureColumns ++ allColumns.map(col))
   }

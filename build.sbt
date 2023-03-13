@@ -4,7 +4,7 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v404"
+lazy val drtLib = "v20230310_2"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
@@ -17,6 +17,7 @@ lazy val jacksonDatabindVersion = "2.13.5"
 lazy val specs2Version = "4.19.2"
 lazy val sparkVersion = "3.3.2"
 lazy val scalaTestVersion = "3.2.15"
+lazy val catsVersion = "2.9.0"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -39,6 +40,7 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % jodaTimeVersion,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
+  "org.typelevel" %% "cats-core" % catsVersion,
 )
 
 lazy val root = (project in file("."))

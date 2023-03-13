@@ -16,39 +16,41 @@ import uk.gov.homeoffice.drt.time.{SDateLike, UtcDate}
 import scala.concurrent.{ExecutionContext, Future}
 
 
-case class ValuesExtractor[T <: TerminalDateActor, A <: WithId, M <: GeneratedMessage](actorClass: Class[T],
-                                                                                       extractValues: M => Option[(Double, Seq[String])],
-                                                                                       extractKey: M => Option[A],
-                                                                                      )
-                                                                                      (implicit system: ActorSystem,
-                                                                                       ec: ExecutionContext,
-                                                                                       timeout: Timeout
-                                                                                      ) {
+case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](actorClass: Class[T],
+                                                                             extractValues: _ => Option[(Double, Seq[String], Seq[Double])],
+                                                                             extractKey: M => Option[WithId],
+                                                                            )
+                                                                            (implicit system: ActorSystem,
+                                                                             ec: ExecutionContext,
+                                                                             timeout: Timeout
+                                                                            ) {
   private val log = LoggerFactory.getLogger(getClass)
 
-  val extractValuesByKey: (Terminal, SDateLike, Int) => Source[(A, Iterable[(Double, Seq[String])]), NotUsed] =
+  val extractValuesByKey: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String], Seq[Double])]), NotUsed] =
     (terminal, startDate, numberOfDays) => {
       Source(((-1 * numberOfDays) until 0).toList)
-        .mapAsync(1)(day => extractValuesForDate(terminal, startDate.addDays(day).toUtcDate))
-        .fold(Map[A, Iterable[(Double, Seq[String])]]())(accumulate)
+        .mapAsync(1) { day =>
+          extractValuesForDate(terminal, startDate.addDays(day).toUtcDate)
+        }
+        .fold(Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]())(accumulate)
         .mapConcat(identity)
     }
 
-  private def accumulate(acc: Map[A, Iterable[(Double, Seq[String])]],
-                         incoming: Map[A, Iterable[(Double, Seq[String])]],
-                        ): Map[A, Iterable[(Double, Seq[String])]] =
+  private def accumulate(acc: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]],
+                         incoming: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]],
+                        ): Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]] =
     incoming.foldLeft(acc) {
-      case (acc, (key, arrivals)) => acc.updated(key, acc.getOrElse(key, Map()) ++ arrivals)
+      case (acc, (key, examples)) => acc.updated(key, acc.getOrElse(key, Iterable()) ++ examples)
     }
 
   private def extractValuesForDate(terminal: Terminal, date: UtcDate)
                                   (implicit system: ActorSystem,
                                    ec: ExecutionContext,
                                    timeout: Timeout
-                                  ): Future[Map[A, Iterable[(Double, Seq[String])]]] = {
+                                  ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]] = {
     val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey))
     actor
-      .ask(GetState).mapTo[Map[A, Iterable[(Double, Seq[String])]]]
+      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]]
       .map { arrivals =>
         actor ! PoisonPill
         arrivals

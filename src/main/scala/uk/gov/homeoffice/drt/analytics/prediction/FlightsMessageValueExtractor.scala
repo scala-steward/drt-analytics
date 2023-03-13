@@ -1,45 +1,72 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
+import cats.implicits.toTraverseOps
+import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
-import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
+import uk.gov.homeoffice.drt.prediction.Feature
+import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{OneToManyFeatureColumn, SingleFeatureColumn}
 
 object FlightsMessageValueExtractor {
-  val minutesOffSchedule: FlightWithSplitsMessage => Option[(Double, Seq[String])] = (msg: FlightWithSplitsMessage) => for {
-    scheduled <- msg.getFlight.scheduled
-    touchdown <- msg.getFlight.touchdown
-  } yield {
-    val minutes = (touchdown - scheduled).toDouble / 60000
-    (minutes, featureValues(scheduled))
+  private val log = org.slf4j.LoggerFactory.getLogger(getClass)
+
+  private def oneToManyFeatureValues[T](arrival: T, features: Seq[Feature]): Option[Seq[String]] =
+    features.collect {
+      case OneToMany(columns, _) =>
+        columns.map {
+          case column: OneToManyFeatureColumn[T] => column.value(arrival)
+        }
+    }.flatten.traverse(identity)
+
+  private def singleFeatureValues[T](arrival: T, features: Seq[Feature]): Option[Seq[Double]] =
+    features.collect {
+      case Single(column: SingleFeatureColumn[T]) => column.value(arrival)
+    }.traverse(identity)
+
+  val minutesOffSchedule: Seq[Feature] => Arrival => Option[(Double, Seq[String], Seq[Double])] = features => {
+    case arrival: Arrival =>
+      for {
+        touchdown <- arrival.Actual
+        oneToManyValues <- oneToManyFeatureValues(arrival, features)
+        singleValues <- singleFeatureValues(arrival, features)
+      } yield {
+        val minutes = (touchdown - arrival.Scheduled).toDouble / 60000
+        (minutes, oneToManyValues, singleValues)
+      }
+    case unexpected =>
+      log.error(s"Unexpected message type ${unexpected.getClass} in minutesOffSchedule")
+      None
   }
 
-  val minutesToChox: FlightWithSplitsMessage => Option[(Double, Seq[String])] = (msg: FlightWithSplitsMessage) => for {
-    scheduled <- msg.getFlight.scheduled
-    touchdown <- msg.getFlight.touchdown
-    actualChox <- msg.getFlight.actualChox
-  } yield {
-    val minutes = (actualChox - touchdown).toDouble / 60000
-    (minutes, featureValues(scheduled))
+  val minutesToChox: Seq[Feature] => Arrival => Option[(Double, Seq[String], Seq[Double])] = features => {
+    case arrival: Arrival =>
+      for {
+        touchdown <- arrival.Actual
+        actualChox <- arrival.ActualChox
+        oneToManyValues <- oneToManyFeatureValues(arrival, features)
+        singleValues <- singleFeatureValues(arrival, features)
+      } yield {
+        val minutes = (actualChox - touchdown).toDouble / 60000
+        (minutes, oneToManyValues, singleValues)
+      }
+    case unexpected =>
+      log.error(s"Unexpected message type ${unexpected.getClass} in minutesToChox")
+      None
   }
 
-  def walkTimeMinutes(walkTimeProvider: (Terminal, String, String) => Option[Int]): FlightWithSplitsMessage => Option[(Double, Seq[String])] = (msg: FlightWithSplitsMessage) => {
-    val flight = msg.getFlight
-    for {
-      terminal <- flight.terminal.map(Terminal(_))
-      scheduled <- flight.scheduled
-      walkTimeMinutes <- walkTimeProvider(terminal, flight.gate.getOrElse(""), flight.stand.getOrElse(""))
-    }
-    yield (walkTimeMinutes.toDouble, featureValues(scheduled))
+  def walkTimeMinutes(walkTimeProvider: (Terminal, String, String) => Option[Int],
+                     ): Seq[Feature] => Arrival => Option[(Double, Seq[String], Seq[Double])] = features => {
+    case arrival: Arrival =>
+      for {
+        walkTimeMinutes <- walkTimeProvider(arrival.Terminal, arrival.Gate.getOrElse(""), arrival.Stand.getOrElse(""))
+        oneToManyValues <- oneToManyFeatureValues(arrival, features)
+        singleValues <- singleFeatureValues(arrival, features)
+      } yield {
+        (walkTimeMinutes.toDouble, oneToManyValues, singleValues)
+      }
+
+    case unexpected =>
+      log.error(s"Unexpected message type ${unexpected.getClass} in walkTimeMinutes")
+      None
   }
-
-  private def featureValues(scheduled: Long): Seq[String] = {
-    val scheduledSdate = SDate(scheduled)
-    val mornAft = morningAfternoon(scheduledSdate)
-    val dow = dayOfWeek(scheduledSdate)
-    Seq(dow, mornAft)
-  }
-
-  private def dayOfWeek(scheduled: SDateLike): String = scheduled.getDayOfWeek.toString
-
-  private def morningAfternoon(scheduled: SDateLike): String = s"${scheduled.getHours / 12}"
 }

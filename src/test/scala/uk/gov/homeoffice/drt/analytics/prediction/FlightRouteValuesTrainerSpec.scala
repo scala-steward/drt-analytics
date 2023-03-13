@@ -9,7 +9,9 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel, TerminalFlightNumberOrigin, WithId}
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
-import uk.gov.homeoffice.drt.ports.Terminals.T2
+import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
+import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Carrier
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
@@ -51,9 +53,9 @@ class FlightRouteValuesTrainerSpec
   }
 
   "FlightRouteValuesTrainer" should {
-    val example = (1.0, Seq("dow_1", "pod_1"))
+    val example = (1.0, Seq("dow_1", "pod_1"), Seq(1d))
 
-    def examples(n: Int): Iterable[(Double, Seq[String])] = Iterable.fill(n)(example)
+    def examples(n: Int): Iterable[(Double, Seq[String], Seq[Double])] = Iterable.fill(n)(example)
 
     "Send a RemoveModel when there are too few training examples" in {
       val probe = TestProbe("test-probe")
@@ -68,10 +70,11 @@ class FlightRouteValuesTrainerSpec
     }
   }
 
-  private def getTrainer(examples: Iterable[(Double, Seq[String])], probe: ActorRef) = {
+  private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double])], probe: ActorRef): FlightRouteValuesTrainer = {
     FlightRouteValuesTrainer(
       "some-model",
-      (_, _, _) => {
+      List(OneToMany(List(Carrier), "car")),
+      (_: Terminal, _: SDateLike, _: Int) => {
         Source(List((TerminalFlightNumberOrigin("T2", 1, "JFK"), examples)))
       },
       MockPersistence(probe),

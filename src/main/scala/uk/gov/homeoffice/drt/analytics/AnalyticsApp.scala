@@ -1,24 +1,19 @@
 package uk.gov.homeoffice.drt.analytics
 
+import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.Source
 import akka.util.Timeout
-import akka.{Done, NotUsed}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.actor.PredictionModelActor.{TerminalCarrierOrigin, TerminalFlightNumberOrigin, WithId}
-import uk.gov.homeoffice.drt.actor.WalkTimeProvider
-import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer
-import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.{minutesOffSchedule, minutesToChox, walkTimeMinutes}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
+import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, ToChoxModelDefinition, WalkTimeModelDefinition}
+import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
-import uk.gov.homeoffice.drt.prediction.arrival.{OffScheduleModelAndFeatures, ToChoxModelAndFeatures, WalkTimeModelAndFeatures}
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
-import uk.gov.homeoffice.drt.time.SDateLike
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
@@ -31,6 +26,7 @@ object AnalyticsApp extends App {
   implicit val system: ActorSystem = ActorSystem("DrtAnalytics")
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
   implicit val timeout: Timeout = new Timeout(5 seconds)
+  implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   val portCode = PortCode(config.getString("port-code").toUpperCase)
   val daysToLookBack = config.getInt("days-to-look-back")
@@ -51,37 +47,20 @@ object AnalyticsApp extends App {
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
         case "update-off-schedule-models" =>
-          trainModels(
-            OffScheduleModelAndFeatures.targetName,
-            portConfig.terminals,
-            minutesOffSchedule,
-            TerminalFlightNumberOrigin.fromMessage,
-            baselineValue = _ => 0d)
+          trainModels(OffScheduleModelDefinition, portConfig.terminals)
 
         case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-          trainModels(
-            ToChoxModelAndFeatures.targetName,
-            portConfig.terminals,
-            minutesToChox,
-            TerminalFlightNumberOrigin.fromMessage,
-            _ => baselineTimeToChox)
+          trainModels(ToChoxModelDefinition(baselineTimeToChox), portConfig.terminals)
 
         case "update-walk-time-models" =>
-          val baselineWalkTimeSeconds: Terminal => Double = (t: Terminal) => portConfig.defaultWalkTimeMillis.get(t).map(_.toDouble / 1000).getOrElse(0)
           val gatesPath = config.getString("options.gates-walk-time-file-path")
           val maybeGatesFile = if (gatesPath.nonEmpty) Option(gatesPath) else None
           val standsPath = config.getString("options.stands-walk-time-file-path")
           val maybeStandsFile = if (standsPath.nonEmpty) Option(standsPath) else None
-          val provider = WalkTimeProvider(maybeGatesFile, maybeStandsFile)
 
           log.info(s"Loaded walk times from $maybeGatesFile and $maybeStandsFile")
-          trainModels(
-            WalkTimeModelAndFeatures.targetName,
-            portConfig.terminals,
-            walkTimeMinutes(provider),
-            TerminalCarrierOrigin.fromMessage,
-            baselineWalkTimeSeconds)
+          trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
@@ -92,17 +71,64 @@ object AnalyticsApp extends App {
       System.exit(0)
   }
 
-  private def trainModels(modelName: String,
-                          terminals: Iterable[Terminal],
-                          featuresFromMessage: FlightWithSplitsMessage => Option[(Double, Seq[String])],
-                          keyFromMessage: FlightWithSplitsMessage => Option[WithId],
-                          baselineValue: Terminal => Double): Future[Done] = {
-    val examplesProvider: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String])]), NotUsed] =
-      ValuesExtractor(classOf[FlightValueExtractionActor], featuresFromMessage, keyFromMessage).extractValuesByKey
+  private def trainModels[T](modDef: ModelDefinition[T, Terminal], terminals: Iterable[Terminal]): Future[Done] = {
+    val examplesProvider = ValuesExtractor(classOf[FlightValueExtractionActor], modDef.targetValueAndFeatures, modDef.aggregateValue).extractValuesByKey
     val persistence = Flight()
 
-    FlightRouteValuesTrainer(modelName, examplesProvider, persistence, baselineValue, daysOfTrainingData)
+    FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
   }
 }
 
+
+//Terminal/Carrier - with day & am/pm based:
+//Terminal T2: 34 total, 31 models
+//91% >= 10% improvement
+//91% >= 20% improvement
+//91% >= 30% improvement
+//91% >= 40% improvement
+//91% >= 50% improvement
+//82% >= 60% improvement
+//70% >= 70% improvement
+//52% >= 80% improvement
+//38% >= 90% improvement
+//14% >= 100% improvement
+
+//Terminal/Carrier based:
+//Terminal T2: 34 total, 31 models
+//91% >= 10% improvement
+//91% >= 20% improvement
+//91% >= 30% improvement
+//91% >= 40% improvement
+//91% >= 50% improvement
+//82% >= 60% improvement
+//70% >= 70% improvement
+//52% >= 80% improvement
+//38% >= 90% improvement
+//14% >= 100% improvement
+
+//Terminal/Carrier/Origin based:
+//Terminal T2: 81 total, 63 models
+//77% >= 10% improvement
+//77% >= 20% improvement
+//76% >= 30% improvement
+//76% >= 40% improvement
+//76% >= 50% improvement
+//74% >= 60% improvement
+//65% >= 70% improvement
+//46% >= 80% improvement
+//25% >= 90% improvement
+//9% >= 100% improvement
+
+//Terminal/FlightNumber/Origin based:
+//Terminal T2: 249 total, 187 models
+//75% >= 10% improvement
+//75% >= 20% improvement
+//74% >= 30% improvement
+//74% >= 40% improvement
+//74% >= 50% improvement
+//72% >= 60% improvement
+//68% >= 70% improvement
+//52% >= 80% improvement
+//25% >= 90% improvement
+//9% >= 100% improvement
