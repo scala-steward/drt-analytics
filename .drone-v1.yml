@@ -17,7 +17,7 @@ steps:
     environment:
       ARTIFACTORY_PASSWORD:
         from_secret: ARTIFACTORY_PASSWORD
-      ARTIFACTORY_USERNAME: drt-artifactory-robot-token
+      ARTIFACTORY_USERNAME: drt-artifactory-robot
     when:
       event:
         - push
@@ -31,7 +31,7 @@ steps:
     environment:
       ARTIFACTORY_PASSWORD:
         from_secret: ARTIFACTORY_PASSWORD
-      ARTIFACTORY_USERNAME: drt-artifactory-robot-token
+      ARTIFACTORY_USERNAME: drt-artifactory-robot
     when:
       event:
         - push
