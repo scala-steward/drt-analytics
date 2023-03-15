@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions
 
-import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.{TerminalCarrier, WithId}
 import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.minutesToChox
 import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival

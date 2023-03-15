@@ -9,35 +9,20 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
-import uk.gov.homeoffice.drt.analytics.prediction.FlightWithSplitsMessageGenerator.generateFlightWithSplitsMessage
 import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.minutesOffSchedule
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
+import uk.gov.homeoffice.drt.arrivals.ArrivalGenerator
+import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.T2
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.FlightMessage
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike, UtcDate}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
-object FlightWithSplitsMessageGenerator {
-  def generateFlightWithSplitsMessage(terminal: String, flightCode: String, origin: String, scheduled: Long): FlightWithSplitsMessage = {
-    FlightWithSplitsMessage(flight = Option(
-      FlightMessage(
-        terminal = Option(terminal),
-        iATA = Option(flightCode),
-        origin = Option(origin),
-        scheduled = Option(scheduled),
-        touchdown = Option(scheduled),
-      )
-    ))
-  }
 
-}
-
-class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule, TerminalFlightNumberOrigin.fromMessage) {
+class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival) {
   byArrivalKey = Map(
-    ArrivalKey(0L, "T2", 1) -> generateFlightWithSplitsMessage("T2", "BA0001", "LHR", scheduled.millisSinceEpoch),
+    ArrivalKey(0L, "T2", 1) -> ArrivalGenerator.arrival(terminal = T2, iata = "BA0001", origin = PortCode("LHR"), schDt = scheduled.toISOString()),
   )
 }
 
@@ -73,7 +58,7 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val start = scheduled.getLocalLastMidnight
             val days = 10
 
-            val arrivals = ValuesExtractor(classOf[FlightValueExtractionActor], minutesOffSchedule, TerminalFlightNumberOrigin.fromMessage)
+            val arrivals = ValuesExtractor(classOf[FlightValueExtractionActor], minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival)
               .extractValuesByKey(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)

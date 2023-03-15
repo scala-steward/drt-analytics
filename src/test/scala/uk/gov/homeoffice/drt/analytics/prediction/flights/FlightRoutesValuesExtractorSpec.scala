@@ -57,7 +57,7 @@ class TerminalFlightNumberOriginValuesExtractorSpec
 
       val result = Await.result(extractor.extractValuesByKey(T1, SDate("2023-01-01T00:00"), 1).runWith(Sink.seq), 1.second)
 
-      assert(result === Seq((TerminalFlightNumberOrigin("T1", 1, "JFK"), List((0d, List("1", "0"))))))
+      assert(result === Seq((TerminalFlightNumberOrigin("T1", 1, "JFK"), List((0d, List("1", "0"), List())))))
     }
 
     "return a source of (TerminalFlightNumberOrigin, extracted values) for a multiple flights on a multiple routes" in {
@@ -71,12 +71,12 @@ class TerminalFlightNumberOriginValuesExtractorSpec
 
       assert(result === Seq((
         TerminalFlightNumberOrigin("T1", 1, "JFK"), List(
-        (0d, List("1", "0")),
-        (5d, List("2", "1")),
-        (2d, List("3", "0")),
+        (0d, List("1", "0"), List()),
+        (5d, List("2", "1"), List()),
+        (2d, List("3", "0"), List()),
       )), (
         TerminalFlightNumberOrigin("T2", 5555, "ABC"), List(
-        (1d, List("6", "1")),
+        (1d, List("6", "1"), List()),
       )),
       ))
     }

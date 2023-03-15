@@ -1,67 +1,50 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.scalatest.wordspec.AnyWordSpec
+import uk.gov.homeoffice.drt.arrivals.ArrivalGenerator
+import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.FlightWithSplitsMessage
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.FlightMessage
-import uk.gov.homeoffice.drt.time.SDate
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 class FlightsMessageValueExtractorSpec extends AnyWordSpec {
+  implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
+  val features: Seq[OneToMany] = Seq(OneToMany(List(DayOfWeek()), ""), OneToMany(List(PartOfDay()), ""))
+
+  val scheduled: SDateLike = SDate("2023-01-01T00:00")
+  val scheduledDt: String = scheduled.toISOString
+  val scheduledPlus10: String = scheduled.addMinutes(10).toISOString
+  val scheduledPlus15: String = scheduled.addMinutes(15).toISOString
+
   "minutesOffSchedule" should {
-    val scheduled = SDate("2023-01-01T00:00")
     "give the different between scheduled and touchdown, with the day of the week and morning or afternoon flag" in {
-      val fws = FlightWithSplitsMessage(
-        flight = Option(FlightMessage(
-          scheduled = Option(scheduled.millisSinceEpoch),
-          touchdown = Option(scheduled.addMinutes(10).millisSinceEpoch),
-        )),
-      )
-      val result = FlightsMessageValueExtractor.minutesOffSchedule(fws)
-      assert(result == Option((10d, Seq("7", "0"))))
+      val arrival = ArrivalGenerator.arrival(schDt = scheduledDt, actDt = scheduledPlus10)
+      println(s"arrival scheduled: ${SDate(arrival.Scheduled).toISOString()}, actual: ${arrival.Actual}")
+      val result = FlightsMessageValueExtractor.minutesOffSchedule(features)(arrival)
+      assert(result == Option((10d, Seq("7", "0"), Seq())))
     }
     "give None when there is no touchdown time" in {
-      val fws = FlightWithSplitsMessage(
-        flight = Option(FlightMessage(
-          scheduled = Option(scheduled.millisSinceEpoch),
-          touchdown = None,
-        )),
-      )
-      val result = FlightsMessageValueExtractor.minutesOffSchedule(fws)
+      val arrival = ArrivalGenerator.arrival(schDt = scheduledDt)
+      val result = FlightsMessageValueExtractor.minutesOffSchedule(features)(arrival)
       assert(result.isEmpty)
     }
   }
   "minutesToChox" should {
-    val scheduled = SDate("2023-01-01T00:00")
+
     "give the different between chox and touchdown, with the day of the week and morning or afternoon flag" in {
-      val fws = FlightWithSplitsMessage(
-        flight = Option(FlightMessage(
-          scheduled = Option(scheduled.millisSinceEpoch),
-          touchdown = Option(scheduled.millisSinceEpoch),
-          actualChox = Option(scheduled.addMinutes(15).millisSinceEpoch),
-        )),
-      )
-      val result = FlightsMessageValueExtractor.minutesToChox(fws)
-      assert(result == Option((15d, Seq("7", "0"))))
+      val arrival = ArrivalGenerator.arrival(schDt = scheduledDt, actDt = scheduledDt, actChoxDt = scheduledPlus15)
+      val result = FlightsMessageValueExtractor.minutesToChox(features)(arrival)
+      assert(result == Option((15d, Seq("7", "0"), Seq())))
     }
     "give None when there is no touchdown time" in {
-      val fws = FlightWithSplitsMessage(
-        flight = Option(FlightMessage(
-          scheduled = Option(scheduled.millisSinceEpoch),
-          touchdown = None,
-          actualChox = Option(scheduled.addMinutes(15).millisSinceEpoch),
-        )),
-      )
-      val result = FlightsMessageValueExtractor.minutesToChox(fws)
+      val arrival = ArrivalGenerator.arrival(schDt = scheduledDt, actChoxDt = scheduledPlus15)
+      val result = FlightsMessageValueExtractor.minutesToChox(features)(arrival)
       assert(result.isEmpty)
     }
     "give None when there is no actualChox time" in {
-      val fws = FlightWithSplitsMessage(
-        flight = Option(FlightMessage(
-          scheduled = Option(scheduled.millisSinceEpoch),
-          touchdown = Option(scheduled.addMinutes(15).millisSinceEpoch),
-          actualChox = None,
-        )),
-      )
-      val result = FlightsMessageValueExtractor.minutesToChox(fws)
+      val arrival = ArrivalGenerator.arrival(schDt = scheduledDt, actDt = scheduledPlus15)
+      val result = FlightsMessageValueExtractor.minutesToChox(features)(arrival)
       assert(result.isEmpty)
     }
   }
