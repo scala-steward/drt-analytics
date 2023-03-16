@@ -19,7 +19,6 @@ class ArrivalFeatureValuesExtractorSpec extends AnyWordSpec {
   "minutesOffSchedule" should {
     "give the different between scheduled and touchdown, with the day of the week and morning or afternoon flag" in {
       val arrival = ArrivalGenerator.arrival(schDt = scheduledDt, actDt = scheduledPlus10)
-      println(s"arrival scheduled: ${SDate(arrival.Scheduled).toISOString()}, actual: ${arrival.Actual}")
       val result = ArrivalFeatureValuesExtractor.minutesOffSchedule(features)(arrival)
       assert(result == Option((10d, Seq("7", "0"), Seq())))
     }

@@ -22,7 +22,7 @@ import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Futu
 
 class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival) {
   byArrivalKey = Map(
-    ArrivalKey(0L, "T2", 1) -> ArrivalGenerator.arrival(terminal = T2, iata = "BA0001", origin = PortCode("LHR"), schDt = scheduled.toISOString()),
+    ArrivalKey(0L, "T2", 1) -> ArrivalGenerator.arrival(terminal = T2, iata = "BA0001", origin = PortCode("LHR"), schDt = scheduled.toISOString),
   )
 }
 
