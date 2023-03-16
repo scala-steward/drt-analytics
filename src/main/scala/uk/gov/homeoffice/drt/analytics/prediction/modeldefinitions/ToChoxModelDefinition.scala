@@ -1,12 +1,12 @@
 package uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions
 
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{TerminalCarrier, WithId}
-import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.minutesToChox
 import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.Feature
 import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
+import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.minutesToChox
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, FlightNumber, Origin, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.arrival.ToChoxModelAndFeatures
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
