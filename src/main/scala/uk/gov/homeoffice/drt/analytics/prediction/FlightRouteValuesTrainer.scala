@@ -53,7 +53,7 @@ case class FlightRouteValuesTrainer(modelName: String,
     Seq(10, 20, 30, 40, 50, 60, 70, 80, 90, 100).foreach { threshold =>
       val improvementsOverThreshold = result.collect { case Some(imp) if imp >= threshold => imp }.size
       val pctOverThresholdTotal = (improvementsOverThreshold.toDouble / total.toDouble * 100).toInt
-      log.info(s"$pctOverThresholdTotal% >= $threshold% improvement")
+      log.info(s"Terminal ${terminal.toString}: $pctOverThresholdTotal% >= $threshold% improvement")
     }
   }
 
