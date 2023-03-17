@@ -15,6 +15,7 @@ import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
+import java.nio.file.{Files, Paths}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.language.postfixOps
@@ -55,11 +56,11 @@ object AnalyticsApp extends App {
 
         case "update-walk-time-models" =>
           val gatesPath = config.getString("options.gates-walk-time-file-path")
-          val maybeGatesFile = if (gatesPath.nonEmpty) Option(gatesPath) else None
+          val maybeGatesFile = Option(gatesPath).filter(fileExists)
           val standsPath = config.getString("options.stands-walk-time-file-path")
-          val maybeStandsFile = if (standsPath.nonEmpty) Option(standsPath) else None
+          val maybeStandsFile = Option(standsPath).filter(fileExists)
 
-          log.info(s"Loaded walk times from $maybeGatesFile and $maybeStandsFile")
+          log.info(s"Loading walk times from ${maybeGatesFile.toList ++ maybeStandsFile.toList}")
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals)
 
         case unknown =>
@@ -70,6 +71,8 @@ object AnalyticsApp extends App {
       Await.ready(eventualUpdates, 30 minutes)
       System.exit(0)
   }
+
+  private def fileExists(path: String): Boolean = Files.exists(Paths.get(path))
 
   private def trainModels[T](modDef: ModelDefinition[T, Terminal], terminals: Iterable[Terminal]): Future[Done] = {
     val examplesProvider = ValuesExtractor(classOf[FlightValueExtractionActor], modDef.targetValueAndFeatures, modDef.aggregateValue).extractValuesByKey
