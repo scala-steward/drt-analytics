@@ -9,7 +9,7 @@ import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 class ArrivalFeatureValuesExtractorSpec extends AnyWordSpec {
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
-  val features: Seq[OneToMany] = Seq(OneToMany(List(DayOfWeek()), ""), OneToMany(List(PartOfDay()), ""))
+  val features: Seq[OneToMany] = Seq(OneToMany(DayOfWeek(), ""), OneToMany(PartOfDay(), ""))
 
   val scheduled: SDateLike = SDate("2023-01-01T00:00")
   val scheduledDt: String = scheduled.toISOString

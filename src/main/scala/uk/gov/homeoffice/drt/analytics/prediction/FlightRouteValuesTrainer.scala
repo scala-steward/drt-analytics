@@ -12,7 +12,6 @@ import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Regression
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
 import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
 import uk.gov.homeoffice.drt.prediction.{Feature, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
@@ -67,10 +66,7 @@ case class FlightRouteValuesTrainer(modelName: String,
 
     val start = SDate.now().addDays(-1)
 
-    val featureColumnNames: Seq[String] = features.flatMap {
-      case OneToMany(columns, _) => columns.map(_.label)
-      case Single(column) => List(column.label)
-    }
+    val featureColumnNames = features.map(_.column.label)
 
     val trainingSetPct = 100 - validationSetPct
 
@@ -132,13 +128,12 @@ case class FlightRouteValuesTrainer(modelName: String,
     pctImprovement
   }
 
-  private def prepareDataFrame(columnNames: Seq[String], valuesZippedWithIndex: Iterable[((Double, Seq[String], Seq[Double]), Int)])
+  private def prepareDataFrame(featureColumnNames: Seq[String], valuesZippedWithIndex: Iterable[((Double, Seq[String], Seq[Double]), Int)])
                               (implicit session: SparkSession): Dataset[Row] = {
-
     val labelField = StructField("label", DoubleType, nullable = false)
     val indexField = StructField("index", StringType, nullable = false)
 
-    val fields = columnNames.map(columnName =>
+    val fields = featureColumnNames.map(columnName =>
       StructField(columnName, StringType, nullable = false)
     )
     val schema = StructType(labelField +: fields :+ indexField)

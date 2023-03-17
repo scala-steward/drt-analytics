@@ -33,7 +33,7 @@ class DataSetTest extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   val df: DataFrame = MockData.data
 
   "A small DataSet" should {
-    val dataSet = DataSet(df, List(Single(BestPax), OneToMany(List(Carrier, Origin), "a")))
+    val dataSet = DataSet(df, List(Single(BestPax), OneToMany(Carrier, "a")))
 
     "Provide an indexed version with an incrementing number" in {
       dataSet.dfIndexed.select("_index").collect().map(_(0)) === Array(0, 1, 2, 3)

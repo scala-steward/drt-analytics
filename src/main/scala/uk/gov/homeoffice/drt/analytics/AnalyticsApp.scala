@@ -59,7 +59,7 @@ object AnalyticsApp extends App {
           val standsPath = config.getString("options.stands-walk-time-file-path")
 
           log.info(s"Looking for walk time files $gatesPath and $standsPath")
-          
+
           val maybeGatesFile = Option(gatesPath).filter(fileExists)
           val maybeStandsFile = Option(standsPath).filter(fileExists)
 

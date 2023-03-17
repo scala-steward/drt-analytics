@@ -16,10 +16,10 @@ object OffScheduleModelDefinition extends ModelDefinition[Arrival, Terminal] {
 
   override val modelName: String = OffScheduleModelAndFeatures.targetName
   override val features: List[Feature] = List(
-    OneToMany(List(DayOfWeek()), "dow"),
-    OneToMany(List(PartOfDay()), "pod"),
-    OneToMany(List(Carrier), "car"),
-    OneToMany(List(FlightNumber), "fln"),
+    OneToMany(DayOfWeek(), "dow"),
+    OneToMany(PartOfDay(), "pod"),
+    OneToMany(Carrier, "car"),
+    OneToMany(FlightNumber, "fln"),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalOrigin.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = minutesOffSchedule(features)

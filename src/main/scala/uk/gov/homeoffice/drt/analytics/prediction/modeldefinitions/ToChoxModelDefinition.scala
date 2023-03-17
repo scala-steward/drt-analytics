@@ -16,10 +16,10 @@ case class ToChoxModelDefinition(defaultTimeToChox: Long) extends ModelDefinitio
 
   override val modelName: String = ToChoxModelAndFeatures.targetName
   override val features: List[Feature] = List(
-    OneToMany(List(DayOfWeek()), "dow"),
-    OneToMany(List(PartOfDay()), "pod"),
-    OneToMany(List(Origin), "ori"),
-    OneToMany(List(FlightNumber), "fln"),
+    OneToMany(DayOfWeek(), "dow"),
+    OneToMany(PartOfDay(), "pod"),
+    OneToMany(Origin, "ori"),
+    OneToMany(FlightNumber, "fln"),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalCarrier.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = minutesToChox(features)

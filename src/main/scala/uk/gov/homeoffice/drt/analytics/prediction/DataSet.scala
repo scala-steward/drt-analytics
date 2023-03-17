@@ -14,11 +14,11 @@ case class DataSet(df: DataFrame, features: List[Feature]) {
   val numRows: Long = dfIndexed.count()
   val oneToManyFeatureValues: IndexedSeq[String] = features.flatMap {
     case _: Single => Iterable()
-    case OneToMany(columnNames, featurePrefix) =>
+    case OneToMany(column, featurePrefix) =>
       df
-        .select(concat_ws("-", columnNames.map(c => col(c.label)): _*))
+        .select(concat_ws("-", col(column.label)))
         .rdd.distinct.collect
-        .map(r => s"${featurePrefix}_${r.getAs[String](0)}")
+        .map(_.getAs[String](0))
   }.toIndexedSeq
 
   val featuresWithOneToManyValues: FeaturesWithOneToManyValues = FeaturesWithOneToManyValues(features, oneToManyFeatureValues)

@@ -44,7 +44,7 @@ class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll
         (4d, 2d, "4d", "4"),
       ).toDF(colNames: _*)
 
-      val featureSpecs = List(OneToMany(List(Carrier), "f1"), Single(BestPax))
+      val featureSpecs = List(OneToMany(Carrier, "f1"), Single(BestPax))
 
       DataSet(data, featureSpecs).trainModel("target", 100).coefficients.size should ===(5)
     }

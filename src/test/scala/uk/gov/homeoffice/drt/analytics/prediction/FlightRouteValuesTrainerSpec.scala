@@ -7,11 +7,11 @@ import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
-import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel, TerminalFlightNumberOrigin, WithId}
+import uk.gov.homeoffice.drt.actor.PredictionModelActor._
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
-import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{BestPax, Carrier, DayOfWeek, PartOfDay}
+import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
@@ -74,7 +74,7 @@ class FlightRouteValuesTrainerSpec
     implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
     FlightRouteValuesTrainer(
       "some-model",
-      List(OneToMany(List(DayOfWeek()), "dow"), OneToMany(List(PartOfDay()), "pod")),
+      List(OneToMany(DayOfWeek(), "dow"), OneToMany(PartOfDay(), "pod")),
       (_: Terminal, _: SDateLike, _: Int) => {
         Source(List((TerminalFlightNumberOrigin("T2", 1, "JFK"), examples)))
       },

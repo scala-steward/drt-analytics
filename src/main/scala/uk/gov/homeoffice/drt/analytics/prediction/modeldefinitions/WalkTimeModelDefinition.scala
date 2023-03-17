@@ -23,10 +23,10 @@ case class WalkTimeModelDefinition(maybeGatesPath: Option[String],
 
   override val modelName: String = WalkTimeModelAndFeatures.targetName
   override val features: List[Feature] = List(
-    OneToMany(List(DayOfWeek()), "dow"),
-    OneToMany(List(PartOfDay()), "pod"),
-    OneToMany(List(Origin), "ori"),
-    OneToMany(List(FlightNumber), "fln"),
+    OneToMany(DayOfWeek(), "dow"),
+    OneToMany(PartOfDay(), "pod"),
+    OneToMany(Origin, "ori"),
+    OneToMany(FlightNumber, "fln"),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalCarrier.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = walkTimeMinutes(provider)(features)
