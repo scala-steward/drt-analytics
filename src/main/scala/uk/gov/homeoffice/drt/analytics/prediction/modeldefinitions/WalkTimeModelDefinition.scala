@@ -6,7 +6,7 @@ import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.walkTimeMinutes
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, Feature, FlightNumber, Origin, PartOfDay}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns._
 import uk.gov.homeoffice.drt.prediction.arrival.WalkTimeModelAndFeatures
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 

@@ -75,7 +75,7 @@ object AnalyticsApp extends App {
       System.exit(0)
   }
 
-  private def fileExists(path: String): Boolean = Files.exists(Paths.get(path))
+  private def fileExists(path: String): Boolean = path.nonEmpty && Files.exists(Paths.get(path))
 
   private def trainModels[T](modDef: ModelDefinition[T, Terminal], terminals: Iterable[Terminal]): Future[Done] = {
     val examplesProvider = ValuesExtractor(classOf[FlightValueExtractionActor], modDef.targetValueAndFeatures, modDef.aggregateValue).extractValuesByKey
