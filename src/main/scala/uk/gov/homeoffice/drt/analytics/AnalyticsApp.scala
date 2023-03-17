@@ -56,8 +56,11 @@ object AnalyticsApp extends App {
 
         case "update-walk-time-models" =>
           val gatesPath = config.getString("options.gates-walk-time-file-path")
-          val maybeGatesFile = Option(gatesPath).filter(fileExists)
           val standsPath = config.getString("options.stands-walk-time-file-path")
+
+          log.info(s"Looking for walk time files $gatesPath and $standsPath")
+          
+          val maybeGatesFile = Option(gatesPath).filter(fileExists)
           val maybeStandsFile = Option(standsPath).filter(fileExists)
 
           log.info(s"Loading walk times from ${maybeGatesFile.toList ++ maybeStandsFile.toList}")
