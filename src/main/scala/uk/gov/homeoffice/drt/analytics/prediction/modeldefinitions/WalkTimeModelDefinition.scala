@@ -5,10 +5,8 @@ import uk.gov.homeoffice.drt.actor.WalkTimeProvider
 import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.prediction.Feature
-import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.walkTimeMinutes
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, FlightNumber, Origin, PartOfDay}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, Feature, FlightNumber, Origin, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.arrival.WalkTimeModelAndFeatures
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
@@ -22,11 +20,11 @@ case class WalkTimeModelDefinition(maybeGatesPath: Option[String],
   private val provider = WalkTimeProvider(maybeGatesPath, maybeStandsPath)
 
   override val modelName: String = WalkTimeModelAndFeatures.targetName
-  override val features: List[Feature] = List(
-    OneToMany(DayOfWeek(), "dow"),
-    OneToMany(PartOfDay(), "pod"),
-    OneToMany(Origin, "ori"),
-    OneToMany(FlightNumber, "fln"),
+  override val features: List[Feature[Arrival]] = List(
+    DayOfWeek(),
+    PartOfDay(),
+    Origin,
+    FlightNumber,
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalCarrier.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = walkTimeMinutes(provider)(features)

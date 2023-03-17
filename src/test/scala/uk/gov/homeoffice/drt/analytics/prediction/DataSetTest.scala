@@ -4,8 +4,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{BestPax, Carrier, Origin}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{BestPax, Carrier}
 
 object MockData {
   val colNames: Seq[String] = Seq("target", "carrier", "origin", "index")
@@ -33,14 +32,14 @@ class DataSetTest extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   val df: DataFrame = MockData.data
 
   "A small DataSet" should {
-    val dataSet = DataSet(df, List(Single(BestPax), OneToMany(Carrier, "a")))
+    val dataSet = DataSet(df, List(BestPax, Carrier))
 
     "Provide an indexed version with an incrementing number" in {
       dataSet.dfIndexed.select("_index").collect().map(_(0)) === Array(0, 1, 2, 3)
     }
 
     "Provide all the one to many features" in {
-      dataSet.oneToManyFeatureValues.toSet === Set("a_2.0-3d", "a_2.0-4d", "a_1.0-2d", "a_1.0-1d")
+      dataSet.oneToManyFeatureValues.toSet === Set("car_2.0-3d", "car_2.0-4d", "car_1.0-2d", "car_1.0-1d")
     }
 
     "Have a row count matching the number of rows" in {

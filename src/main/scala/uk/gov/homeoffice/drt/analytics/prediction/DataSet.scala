@@ -3,20 +3,18 @@ package uk.gov.homeoffice.drt.analytics.prediction
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
-import uk.gov.homeoffice.drt.prediction.Feature.{OneToMany, Single}
-import uk.gov.homeoffice.drt.prediction.{Feature, FeaturesWithOneToManyValues}
+import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, OneToMany, Single}
 
-import scala.collection.immutable
-
-case class DataSet(df: DataFrame, features: List[Feature]) {
+case class DataSet(df: DataFrame, features: List[Feature[_]]) {
   val dfIndexed: DataFrame = df.withColumn("_index", monotonically_increasing_id())
 
   val numRows: Long = dfIndexed.count()
   val oneToManyFeatureValues: IndexedSeq[String] = features.flatMap {
-    case _: Single => Iterable()
-    case OneToMany(column, featurePrefix) =>
+    case _: Single[_] => Iterable()
+    case feature: OneToMany[_] =>
       df
-        .select(concat_ws("-", col(column.label)))
+        .select(concat_ws("-", col(feature.label)))
         .rdd.distinct.collect
         .map(_.getAs[String](0))
   }.toIndexedSeq

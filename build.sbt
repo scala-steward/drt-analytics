@@ -4,7 +4,7 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v20230317_1"
+lazy val drtLib = "v458"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"

@@ -12,7 +12,8 @@ import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Regression
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
 import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.prediction.{Feature, Persistence}
+import uk.gov.homeoffice.drt.prediction.Persistence
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Feature
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,7 +24,7 @@ object FlightRouteValuesTrainer {
 }
 
 case class FlightRouteValuesTrainer(modelName: String,
-                                    features: List[Feature],
+                                    features: List[Feature[_]],
                                     examplesProvider: ModelExamplesProvider[WithId],
                                     persistence: Persistence,
                                     baselineValue: Terminal => Double,
@@ -66,7 +67,7 @@ case class FlightRouteValuesTrainer(modelName: String,
 
     val start = SDate.now().addDays(-1)
 
-    val featureColumnNames = features.map(_.column.label)
+    val featureColumnNames = features.map(_.label)
 
     val trainingSetPct = 100 - validationSetPct
 

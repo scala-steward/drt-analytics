@@ -10,7 +10,6 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor._
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
-import uk.gov.homeoffice.drt.prediction.Feature.OneToMany
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
@@ -74,7 +73,7 @@ class FlightRouteValuesTrainerSpec
     implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
     FlightRouteValuesTrainer(
       "some-model",
-      List(OneToMany(DayOfWeek(), "dow"), OneToMany(PartOfDay(), "pod")),
+      List(DayOfWeek(), PartOfDay()),
       (_: Terminal, _: SDateLike, _: Int) => {
         Source(List((TerminalFlightNumberOrigin("T2", 1, "JFK"), examples)))
       },
