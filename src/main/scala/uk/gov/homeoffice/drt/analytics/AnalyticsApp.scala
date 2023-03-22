@@ -33,8 +33,6 @@ object AnalyticsApp extends App {
   val daysToLookBack = config.getInt("days-to-look-back")
   val daysOfTrainingData = config.getInt("options.training.days-of-data")
 
-  println(s"Training on $daysOfTrainingData days of data")
-
   AirportConfigs.confByPort.get(portCode) match {
     case None =>
       log.error(s"Invalid port code '$portCode''")
