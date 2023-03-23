@@ -2,12 +2,14 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.slf4j.LoggerFactory
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, ArrivalKeyWithOrigin, GetState}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
+import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsFromMessage
 import uk.gov.homeoffice.drt.time.UtcDate
 
 import scala.util.Try
@@ -15,16 +17,17 @@ import scala.util.Try
 
 class FlightValueExtractionActor(val terminal: Terminal,
                                  val date: UtcDate,
-                                 val extractValues: FlightWithSplitsMessage => Option[(Double, Seq[String])],
-                                ) extends TerminalDateActor with PersistentActor {
+                                 val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])],
+                                 val extractKey: Arrival => Option[WithId],
+                                ) extends TerminalDateActor[Arrival] with PersistentActor {
   private val log = LoggerFactory.getLogger(getClass)
 
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
 
-  var byKey: Map[ArrivalKey, ((Double, Seq[String]), String)] = Map()
-  var byKeyWithOrigin: Map[ArrivalKeyWithOrigin, (Double, Seq[String])] = Map()
+  var byArrivalKey: Map[ArrivalKey, Arrival] = Map()
+  var valuesWithFeaturesByExtractedKey: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]] = Map()
 
-  def parseFlightNumber(code: String): Option[Int] = {
+  private def parseFlightNumber(code: String): Option[Int] = {
     code match {
       case Arrival.flightCodeRegex(_, flightNumber, _) => Try(flightNumber.toInt).toOption
       case _ => None
@@ -39,15 +42,16 @@ class FlightValueExtractionActor(val terminal: Terminal,
       }
 
     case RecoveryCompleted =>
-      byKeyWithOrigin = byKey
+      valuesWithFeaturesByExtractedKey = byArrivalKey
         .groupBy {
-          case (_, (_, origin)) => origin
+          case (_, msg) => extractKey(msg)
         }
-        .flatMap {
-          case (origin, arrivals) =>
-            arrivals.map {
-              case (key, (off, _)) => (ArrivalKeyWithOrigin(key.scheduled, key.terminal, key.number, origin), off)
-            }
+        .collect {
+          case (Some(key), flightMessages) =>
+            val examples = flightMessages
+              .map { case (_, msg) => extractValues(msg) }
+              .collect { case Some(value) => value }
+            (key, examples)
         }
 
     case FlightsWithSplitsDiffMessage(_, removals, updates) =>
@@ -61,7 +65,7 @@ class FlightValueExtractionActor(val terminal: Terminal,
       terminal <- r.terminalName
       flightNumber <- r.number
     } yield {
-      byKey = byKey - ArrivalKey(scheduled, terminal, flightNumber)
+      byArrivalKey = byArrivalKey - ArrivalKey(scheduled, terminal, flightNumber)
     }
 
   private def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit =
@@ -70,13 +74,11 @@ class FlightValueExtractionActor(val terminal: Terminal,
       flightNumber <- parseFlightNumber(flightCode)
       terminal <- u.getFlight.terminal
       scheduled <- u.getFlight.scheduled
-      origin <- u.getFlight.origin
-      extractedValues <- extractValues(u)
     } yield {
-      byKey = byKey.updated(ArrivalKey(scheduled, terminal, flightNumber), (extractedValues, origin))
+      byArrivalKey = byArrivalKey.updated(ArrivalKey(scheduled, terminal, flightNumber), flightWithSplitsFromMessage(u).apiFlight)
     }
 
   override def receiveCommand: Receive = {
-    case GetState => sender() ! byKeyWithOrigin
+    case GetState => sender() ! valuesWithFeaturesByExtractedKey
   }
 }

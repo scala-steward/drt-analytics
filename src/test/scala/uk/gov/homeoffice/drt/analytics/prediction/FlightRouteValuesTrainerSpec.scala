@@ -7,9 +7,10 @@ import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
-import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, Models, RemoveModel}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{FlightRoute, GetState}
-import uk.gov.homeoffice.drt.ports.Terminals.T2
+import uk.gov.homeoffice.drt.actor.PredictionModelActor._
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
+import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ModelCategory, Persistence}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
@@ -32,9 +33,9 @@ case class MockPersistenceActor(probe: ActorRef) extends Actor {
 case class MockPersistence(probe: ActorRef)
                           (implicit
                            val system: ActorSystem, val ec: ExecutionContext, val timeout: Timeout
-                          ) extends Persistence[FlightRoute] {
+                          ) extends Persistence {
   override val modelCategory: ModelCategory = FlightCategory
-  override val actorProvider: (ModelCategory, FlightRoute) => ActorRef =
+  override val actorProvider: (ModelCategory, WithId) => ActorRef =
     (_, _) => system.actorOf(Props(MockPersistenceActor(probe)), s"test-actor")
   override val now: () => SDateLike = () => SDate("2023-01-01T00:00")
 }
@@ -51,14 +52,14 @@ class FlightRouteValuesTrainerSpec
   }
 
   "FlightRouteValuesTrainer" should {
-    val example = (1.0, Seq("dow_1", "pod_1"))
+    val example = (1.0, Seq("car_1", "pod_1"), Seq())
 
-    def examples(n: Int): Iterable[(Double, Seq[String])] = Iterable.fill(n)(example)
+    def examples(n: Int): Iterable[(Double, Seq[String], Seq[Double])] = Iterable.fill(n)(example)
 
     "Send a RemoveModel when there are too few training examples" in {
       val probe = TestProbe("test-probe")
       getTrainer(examples(1), probe.ref).trainTerminals(List(T2))
-      probe.expectMsg(5.seconds, RemoveModel("some-model"))
+      probe.expectMsg(10.seconds, RemoveModel("some-model"))
     }
 
     "Send a ModelUpdate when there are enough training examples" in {
@@ -68,14 +69,16 @@ class FlightRouteValuesTrainerSpec
     }
   }
 
-  private def getTrainer(examples: Iterable[(Double, Seq[String])], probe: ActorRef) = {
+  private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double])], probe: ActorRef): FlightRouteValuesTrainer = {
+    implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
     FlightRouteValuesTrainer(
       "some-model",
-      (_, _, _) => {
-        Source(List((FlightRoute("T2", 1, "JFK"), examples)))
+      List(DayOfWeek(), PartOfDay()),
+      (_: Terminal, _: SDateLike, _: Int) => {
+        Source(List((TerminalFlightNumberOrigin("T2", 1, "JFK"), examples)))
       },
       MockPersistence(probe),
-      1000d,
+      _ => 1000d,
       10
     )
   }

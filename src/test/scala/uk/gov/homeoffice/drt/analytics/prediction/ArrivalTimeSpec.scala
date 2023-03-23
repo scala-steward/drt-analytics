@@ -7,18 +7,23 @@ import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
-import uk.gov.homeoffice.drt.analytics.prediction.FlightsMessageValueExtractor.minutesOffSchedule
-import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightRoutesValuesExtractor, FlightValueExtractionActor}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
+import uk.gov.homeoffice.drt.arrivals.ArrivalGenerator
+import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.T2
-import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
+import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.minutesOffSchedule
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike, UtcDate}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
 
-class MinutesOffScheduledMock extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule) {
-  byKey = Map(ArrivalKey(0L, "T2", 1) -> ((2d, Seq("a", "b")), "MMM"))
+class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival) {
+  byArrivalKey = Map(
+    ArrivalKey(0L, "T2", 1) -> ArrivalGenerator.arrival(terminal = T2, iata = "BA0001", origin = PortCode("LHR"), schDt = scheduled.toISOString),
+  )
 }
 
 class ArrivalTimeSpec extends AnyWordSpec with Matchers {
@@ -35,11 +40,12 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
   }
 
   "A MinutesOffScheduledActor" should {
+    val scheduled = SDate(2020, 10, 1, 12, 5)
     "recover some state" in context {
       implicit system =>
         implicit ec =>
           implicit mat =>
-            val actor = system.actorOf(Props(new MinutesOffScheduledMock))
+            val actor = system.actorOf(Props(new MinutesOffScheduledMock(scheduled)))
             val result = Await.result(actor.ask(GetState).mapTo[Map[ArrivalKey, Int]], 1.second)
 
             result.size should not be 0
@@ -49,10 +55,11 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
       implicit system =>
         implicit ec =>
           implicit mat =>
-            val start = SDate(2020, 10, 1, 0, 0)
+            val start = scheduled.getLocalLastMidnight
             val days = 10
 
-            val arrivals = FlightRoutesValuesExtractor[FlightValueExtractionActor](classOf[FlightValueExtractionActor], minutesOffSchedule).extractedValueByFlightRoute(T2, start, days)
+            val arrivals = ValuesExtractor(classOf[FlightValueExtractionActor], minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival)
+              .extractValuesByKey(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)
 

@@ -16,6 +16,9 @@ WORKDIR /opt/docker
 COPY --from=stage0 --chown=drt:root /2/opt/docker /opt/docker
 COPY --from=stage0 --chown=drt:root /4/opt/docker /opt/docker
 
+RUN mkdir -p /var/data
+RUN chown 1001:1001 -R /var/data
+
 RUN mkdir -p /var/data/logs
 RUN chown 1001:1001 -R /var/data/logs
 
