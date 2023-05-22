@@ -2,15 +2,17 @@ package uk.gov.homeoffice.drt.analytics
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
-import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, ToChoxModelDefinition, WalkTimeModelDefinition}
+import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, PaxModelDefinition, PaxModelStats, ToChoxModelDefinition, WalkTimeModelDefinition}
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
+import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.PortCode
-import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
@@ -35,7 +37,7 @@ object AnalyticsApp extends App {
 
   AirportConfigs.confByPort.get(portCode) match {
     case None =>
-      log.error(s"Invalid port code '$portCode''")
+      log.error(s"Invalid port code '$portCode'")
       system.terminate()
       System.exit(0)
 
@@ -64,6 +66,9 @@ object AnalyticsApp extends App {
           log.info(s"Loading walk times from ${maybeGatesFile.toList ++ maybeStandsFile.toList}")
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals)
 
+        case "update-pax-models" =>
+          trainModels(PaxModelDefinition, portConfig.terminals)
+
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
           Future.successful(Done)
@@ -81,5 +86,25 @@ object AnalyticsApp extends App {
 
     FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
+      .map { _ =>
+        log.info(s"Checking daily pax loads")
+        val startDate = SDate.now().addDays(-360)
+        Source(0 to 360)
+          .mapAsync(1) { daysAgo =>
+            val date = startDate.addDays(-daysAgo).toUtcDate
+            val predFn: Arrival => Future[Int] = PaxModelStats.predictionForArrival(PaxModelDefinition.aggregateValue, persistence.getModels)
+            val eventualArrivals = PaxModelStats.arrivalsForDate(date, T1)
+            for {
+              actPaxSum <- PaxModelStats.sumActPaxForDate(eventualArrivals)
+              predPaxSum <- PaxModelStats.sumPredPaxForDate(eventualArrivals, predFn)
+            } yield {
+              (date, predPaxSum, actPaxSum)
+            }
+          }
+          .runForeach { case (date, predPaxSum, actPaxSum) =>
+            println(s"$date: $actPaxSum actual pax, $predPaxSum predicted pax, diff ${predPaxSum - actPaxSum}")
+          }
+        Done
+      }
   }
 }
