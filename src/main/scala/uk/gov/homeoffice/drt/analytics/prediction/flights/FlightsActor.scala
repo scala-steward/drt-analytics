@@ -61,6 +61,6 @@ class FlightsActor(val terminal: Terminal,
     }
 
   override def receiveCommand: Receive = {
-    case GetState => sender() ! byArrivalKey
+    case GetState => sender() ! byArrivalKey.values.toSeq
   }
 }

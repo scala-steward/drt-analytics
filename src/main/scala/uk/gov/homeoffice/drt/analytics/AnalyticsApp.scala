@@ -86,25 +86,29 @@ object AnalyticsApp extends App {
 
     FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
-      .map { _ =>
+      .flatMap { _ =>
         log.info(s"Checking daily pax loads")
-        val startDate = SDate.now().addDays(-360)
-        Source(0 to 360)
+        val startDate = SDate.now()
+        Source((10 to 150).toList)
           .mapAsync(1) { daysAgo =>
             val date = startDate.addDays(-daysAgo).toUtcDate
             val predFn: Arrival => Future[Int] = PaxModelStats.predictionForArrival(PaxModelDefinition.aggregateValue, persistence.getModels)
-            val eventualArrivals = PaxModelStats.arrivalsForDate(date, T1)
             for {
-              actPaxSum <- PaxModelStats.sumActPaxForDate(eventualArrivals)
-              predPaxSum <- PaxModelStats.sumPredPaxForDate(eventualArrivals, predFn)
+              arrivals <- PaxModelStats.arrivalsForDate(date, T1)
+              predPaxSum <- PaxModelStats.sumPredPaxForDate(arrivals, predFn)
             } yield {
+              val actPaxSum = PaxModelStats.sumActPaxForDate(arrivals)
               (date, predPaxSum, actPaxSum)
             }
           }
           .runForeach { case (date, predPaxSum, actPaxSum) =>
-            println(s"$date: $actPaxSum actual pax, $predPaxSum predicted pax, diff ${predPaxSum - actPaxSum}")
+            val pctDiff = (predPaxSum - actPaxSum).toDouble / actPaxSum.toDouble * 100
+            println(f"$date: $actPaxSum actual pax, $predPaxSum predicted pax, diff ${pctDiff}%.2f")
           }
-        Done
+//        Done
       }
+
+//    Await.ready(f, 10.seconds)
+//    Future.successful(Done)
   }
 }
