@@ -17,7 +17,7 @@ lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.13.5"
 lazy val specs2Version = "4.19.2"
 lazy val sparkVersion = "3.3.2"
-lazy val scalaTestVersion = "3.2.15"
+lazy val scalaTestVersion = "3.2.16"
 lazy val catsVersion = "2.9.0"
 
 libraryDependencies ++= Seq(
