@@ -69,7 +69,7 @@ object AnalyticsApp extends App {
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals)
 
         case "update-pax-models" =>
-          trainModels(PaxModelDefinition, portConfig.terminals).map {_ =>
+          trainModels(PaxModelDefinition, portConfig.terminals).flatMap {_ =>
             dumpDailyPax(150, portConfig.terminals)
           }
 
