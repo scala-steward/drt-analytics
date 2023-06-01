@@ -69,7 +69,9 @@ object AnalyticsApp extends App {
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals)
 
         case "update-pax-models" =>
-          trainModels(PaxModelDefinition, portConfig.terminals)
+          trainModels(PaxModelDefinition, portConfig.terminals).map {_ =>
+            dumpDailyPax(150, portConfig.terminals)
+          }
 
         case "dump-daily-pax" =>
           dumpDailyPax(daysOfTrainingData, portConfig.terminals)
@@ -91,9 +93,6 @@ object AnalyticsApp extends App {
 
     FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
-      .flatMap { _ =>
-        dumpDailyPax(daysOfTrainingData, terminals)
-      }
   }
 
   private def dumpDailyPax(days: Int, terminals: Iterable[Terminal]) = {
@@ -101,10 +100,6 @@ object AnalyticsApp extends App {
     val persistence = Flight()
 
     println(s"Date,Holiday,Terminal,Actual Pax,Flights,Pax per flight,Predicted Pax,Pred per flight,Diff %,% Cap")
-    val daysTerminals = for {
-      terminal <- terminals
-      daysAgo <- 0 to days
-    } yield (daysAgo, terminal)
 
     Source(terminals.toList)
       .mapAsync(1) { terminal =>
@@ -128,34 +123,33 @@ object AnalyticsApp extends App {
             } yield {
               val actPax = PaxModelStats.sumActPaxForDate(arrivals)
               val flightsCount = arrivals.length
-              val perFlight = if (flightsCount > 0) actPax.toDouble / flightsCount else 0
-              val predPerFlight = if (flightsCount > 0) predPax.toDouble / flightsCount else 0
-              val maxPax = arrivals.map(_.MaxPax.getOrElse(0)).sum
-              val isHoliday = if (BankHolidays.isHolidayOrHolidayWeekend(LocalDate(date.year, date.month, date.day))) 1 else 0
-              (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight)
+//              val perFlight = if (flightsCount > 0) actPax.toDouble / flightsCount else 0
+//              val predPerFlight = if (flightsCount > 0) predPax.toDouble / flightsCount else 0
+              (predPax, actPax, flightsCount)
             }
           }
-          .collect { case (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight) if flightsCount > 0 =>
-            (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight)
+          .collect { case (predPax, actPax, flightsCount) if flightsCount > 0 =>
+            (predPax, actPax)
           }
           .runWith(Sink.seq)
-          .map(stats => (terminal, model, stats))
+          .map(stats => (terminal, stats))
       }
-      .runForeach { case (terminal, model, results) =>
-        val diffs = results.map { case (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight) =>
+      .runForeach { case (terminal, results) =>
+        val diffs = results.map { case (predPax, actPax) =>
           predPax - actPax
         }
-        val min = diffs.min
-        val max = diffs.max
+        val minDiff = results.minBy { case (predPax, actPax) =>
+          predPax - actPax
+        }
+        val maxDiff = results.maxBy { case (predPax, actPax) =>
+          predPax - actPax
+        }
+        val min = (minDiff._1 - minDiff._2).toDouble / minDiff._2 * 100
+        val max = (maxDiff._1 - maxDiff._2).toDouble / maxDiff._2 * 100
         val rmse = Math.sqrt(diffs.map(d => d * d).sum / diffs.length)
-        val meanPax = results.map(_._6).sum / results.length
+        val meanPax = results.map(_._2).sum / results.length
         val rmsePercent = rmse / meanPax * 100
-        log.info(f"Terminal $terminal: Mean daily pax: $meanPax, RMSE: $rmse%.2f ($rmsePercent%.1f%%), min: $min, max: $max")
+        log.info(f"Terminal $terminal: Mean daily pax: $meanPax, RMSE: $rmse%.2f ($rmsePercent%.1f%%), min: $min%.1f%%, max: $max%.1f%%")
       }
-    //      .runForeach { case (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight) =>
-    //        val pctDiff = if (actPax > 0) (predPax - actPax).toDouble / actPax.toDouble * 100 else 0
-    //        println(f"$date,$isHoliday,$terminal,$actPax,$flightsCount,$perFlight%.0f,$predPax,$predPerFlight%.2f,$pctDiff%.2f,${actPax.toDouble / maxPax}%.2f")
-    //      }
-
   }
 }

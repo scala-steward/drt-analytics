@@ -88,7 +88,7 @@ object PaxModelStats {
                           (implicit ec: ExecutionContext): Future[Int] =
     Future.successful(model.prediction(arrival)
       .getOrElse({
-        val fallback = arrival.MaxPax.map(_ * 0.8).getOrElse(220d)
+        val fallback = arrival.MaxPax.filter(_ > 0).map(_ * 0.8).getOrElse(175d)
         log.warn(s"Using fallback prediction of $fallback for $arrival")
         fallback.toInt
       }))
