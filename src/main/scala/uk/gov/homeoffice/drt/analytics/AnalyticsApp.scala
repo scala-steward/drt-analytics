@@ -2,20 +2,22 @@ package uk.gov.homeoffice.drt.analytics
 
 import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.actor.PredictionModelActor
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, PaxModelDefinition, PaxModelStats, ToChoxModelDefinition, WalkTimeModelDefinition}
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.arrivals.Arrival
-import uk.gov.homeoffice.drt.ports.PortCode
+import uk.gov.homeoffice.drt.ports.{AirportConfig, PortCode}
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
+import uk.gov.homeoffice.drt.prediction.arrival.PaxModelAndFeatures
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
-import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
+import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike, UtcDate}
 
 import java.nio.file.{Files, Paths}
 import scala.concurrent.duration._
@@ -69,6 +71,9 @@ object AnalyticsApp extends App {
         case "update-pax-models" =>
           trainModels(PaxModelDefinition, portConfig.terminals)
 
+        case "dump-daily-pax" =>
+          dumpDailyPax(daysOfTrainingData, portConfig.terminals)
+
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
           Future.successful(Done)
@@ -87,28 +92,70 @@ object AnalyticsApp extends App {
     FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
       .flatMap { _ =>
-        log.info(s"Checking daily pax loads")
-        val startDate = SDate.now()
-        Source((10 to 150).toList)
-          .mapAsync(1) { daysAgo =>
-            val date = startDate.addDays(-daysAgo).toUtcDate
-            val predFn: Arrival => Future[Int] = PaxModelStats.predictionForArrival(PaxModelDefinition.aggregateValue, persistence.getModels)
+        dumpDailyPax(daysOfTrainingData, terminals)
+      }
+  }
+
+  private def dumpDailyPax(days: Int, terminals: Iterable[Terminal]) = {
+    val startDate = SDate.now().addDays(-days)
+    val persistence = Flight()
+
+    println(s"Date,Holiday,Terminal,Actual Pax,Flights,Pax per flight,Predicted Pax,Pred per flight,Diff %,% Cap")
+    val daysTerminals = for {
+      terminal <- terminals
+      daysAgo <- 0 to days
+    } yield (daysAgo, terminal)
+
+    Source(terminals.toList)
+      .mapAsync(1) { terminal =>
+        val terminalId = PredictionModelActor.Terminal(terminal.toString)
+        persistence.getModels(terminalId).map(models => (terminal, models))
+      }
+      .map { case (terminal, models) =>
+        (terminal, models.models.values.collect { case m: PaxModelAndFeatures => m })
+      }
+      .collect {
+        case (terminal, model) => (terminal, model.head)
+      }
+      .mapAsync(1) { case (terminal, model) =>
+        Source((0 to days).toList)
+          .mapAsync(1) { case daysAgo =>
+            val date = startDate.addDays(daysAgo).toUtcDate
+            val predFn: Arrival => Future[Int] = PaxModelStats.predictionForArrival(model)
             for {
-              arrivals <- PaxModelStats.arrivalsForDate(date, T1)
-              predPaxSum <- PaxModelStats.sumPredPaxForDate(arrivals, predFn)
+              arrivals <- PaxModelStats.arrivalsForDate(date, terminal).map(_.filter(!_.Origin.isDomesticOrCta))
+              predPax <- PaxModelStats.sumPredPaxForDate(arrivals, predFn)
             } yield {
-              val actPaxSum = PaxModelStats.sumActPaxForDate(arrivals)
-              (date, predPaxSum, actPaxSum)
+              val actPax = PaxModelStats.sumActPaxForDate(arrivals)
+              val flightsCount = arrivals.length
+              val perFlight = if (flightsCount > 0) actPax.toDouble / flightsCount else 0
+              val predPerFlight = if (flightsCount > 0) predPax.toDouble / flightsCount else 0
+              val maxPax = arrivals.map(_.MaxPax.getOrElse(0)).sum
+              val isHoliday = if (BankHolidays.isHolidayOrHolidayWeekend(LocalDate(date.year, date.month, date.day))) 1 else 0
+              (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight)
             }
           }
-          .runForeach { case (date, predPaxSum, actPaxSum) =>
-            val pctDiff = (predPaxSum - actPaxSum).toDouble / actPaxSum.toDouble * 100
-            println(f"$date: $actPaxSum actual pax, $predPaxSum predicted pax, diff ${pctDiff}%.2f")
+          .collect { case (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight) if flightsCount > 0 =>
+            (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight)
           }
-//        Done
+          .runWith(Sink.seq)
+          .map(stats => (terminal, model, stats))
       }
+      .runForeach { case (terminal, model, results) =>
+        val diffs = results.map { case (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight) =>
+          predPax - actPax
+        }
+        val min = diffs.min
+        val max = diffs.max
+        val rmse = Math.sqrt(diffs.map(d => d * d).sum / diffs.length)
+        val meanPax = results.map(_._6).sum / results.length
+        val rmsePercent = rmse / meanPax * 100
+        log.info(f"Terminal $terminal: Mean daily pax: $meanPax, RMSE: $rmse%.2f ($rmsePercent%.1f%%), min: $min, max: $max")
+      }
+    //      .runForeach { case (date, isHoliday, terminal, predPax, predPerFlight, actPax, maxPax, flightsCount, perFlight) =>
+    //        val pctDiff = if (actPax > 0) (predPax - actPax).toDouble / actPax.toDouble * 100 else 0
+    //        println(f"$date,$isHoliday,$terminal,$actPax,$flightsCount,$perFlight%.0f,$predPax,$predPerFlight%.2f,$pctDiff%.2f,${actPax.toDouble / maxPax}%.2f")
+    //      }
 
-//    Await.ready(f, 10.seconds)
-//    Future.successful(Done)
   }
 }

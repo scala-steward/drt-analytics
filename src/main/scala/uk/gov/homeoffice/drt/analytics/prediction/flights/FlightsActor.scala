@@ -8,7 +8,7 @@ import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
 import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsFromMessage
-import uk.gov.homeoffice.drt.time.UtcDate
+import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 import scala.util.Try
 
@@ -36,9 +36,12 @@ class FlightsActor(val terminal: Terminal,
         case unexpected => log.warn(s"Got unexpected snapshot offer message: ${unexpected.getClass}")
       }
 
-    case FlightsWithSplitsDiffMessage(_, removals, updates) =>
+    case FlightsWithSplitsDiffMessage(Some(createdAt), removals, updates) =>
       updates.foreach(processFlightsWithSplitsMessage)
-      removals.foreach(processRemovalMessage)
+      if (SDate(createdAt) < SDate(date).addHours(28)) {
+        if (removals.length < byArrivalKey.size)
+          removals.foreach(processRemovalMessage)
+      }
   }
 
   private def processRemovalMessage(r: UniqueArrivalMessage): Unit =
@@ -61,6 +64,7 @@ class FlightsActor(val terminal: Terminal,
     }
 
   override def receiveCommand: Receive = {
-    case GetState => sender() ! byArrivalKey.values.toSeq
+    case GetState =>
+      sender() ! byArrivalKey.values.toSeq
   }
 }
