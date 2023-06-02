@@ -8,16 +8,17 @@ import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.PredictionModelActor
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
-import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, PaxModelDefinition, PaxModelStats, ToChoxModelDefinition, WalkTimeModelDefinition}
+import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions._
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
 import uk.gov.homeoffice.drt.arrivals.Arrival
-import uk.gov.homeoffice.drt.ports.{AirportConfig, PortCode}
-import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
+import uk.gov.homeoffice.drt.ports.PortCode
+import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
-import uk.gov.homeoffice.drt.prediction.arrival.PaxModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.ModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.arrival.{ArrivalModelAndFeatures, PaxCapModelAndFeatures, PaxModelAndFeatures}
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
-import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike, UtcDate}
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import java.nio.file.{Files, Paths}
 import scala.concurrent.duration._
@@ -69,12 +70,20 @@ object AnalyticsApp extends App {
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals)
 
         case "update-pax-models" =>
-          trainModels(PaxModelDefinition, portConfig.terminals).flatMap {_ =>
-            dumpDailyPax(150, portConfig.terminals)
+          trainModels(PaxModelDefinition, portConfig.terminals).flatMap { _ =>
+            dumpDailyPax(150, portConfig.terminals, PaxModelStats, paxModelCollector)
+          }
+
+        case "update-pax-cap-models" =>
+          trainModels(PaxCapModelDefinition, portConfig.terminals).flatMap { _ =>
+            dumpDailyPax(150, portConfig.terminals, PaxCapModelStats, paxCapModelCollector)
           }
 
         case "dump-daily-pax" =>
-          dumpDailyPax(daysOfTrainingData, portConfig.terminals)
+          dumpDailyPax(daysOfTrainingData, portConfig.terminals, PaxModelStats, paxModelCollector)
+
+        case "dump-daily-pax-cap" =>
+          dumpDailyPax(daysOfTrainingData, portConfig.terminals, PaxCapModelStats, paxCapModelCollector)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
@@ -83,6 +92,13 @@ object AnalyticsApp extends App {
 
       Await.ready(eventualUpdates, 30 minutes)
       System.exit(0)
+  }
+
+  def paxModelCollector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures] = _.collect {
+    case m: PaxModelAndFeatures => m
+  }
+  def paxCapModelCollector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures] = _.collect {
+    case m: PaxCapModelAndFeatures => m
   }
 
   private def fileExists(path: String): Boolean = path.nonEmpty && Files.exists(Paths.get(path))
@@ -95,7 +111,7 @@ object AnalyticsApp extends App {
       .trainTerminals(terminals.toList)
   }
 
-  private def dumpDailyPax(days: Int, terminals: Iterable[Terminal]) = {
+  private def dumpDailyPax(days: Int, terminals: Iterable[Terminal], stats: PaxModelStatsLike, collector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures]): Future[Done] = {
     val startDate = SDate.now().addDays(-days)
     val persistence = Flight()
 
@@ -107,32 +123,32 @@ object AnalyticsApp extends App {
         persistence.getModels(terminalId).map(models => (terminal, models))
       }
       .map { case (terminal, models) =>
-        (terminal, models.models.values.collect { case m: PaxModelAndFeatures => m })
+        (terminal, collector(models.models.values))
       }
       .collect {
         case (terminal, model) => (terminal, model.head)
       }
       .mapAsync(1) { case (terminal, model) =>
         Source((0 to days).toList)
-          .mapAsync(1) { case daysAgo =>
+          .mapAsync(1) { daysAgo =>
             val date = startDate.addDays(daysAgo).toUtcDate
-            val predFn: Arrival => Future[Int] = PaxModelStats.predictionForArrival(model)
-            for {
-              arrivals <- PaxModelStats.arrivalsForDate(date, terminal).map(_.filter(!_.Origin.isDomesticOrCta))
-              predPax <- PaxModelStats.sumPredPaxForDate(arrivals, predFn)
-            } yield {
-              val actPax = PaxModelStats.sumActPaxForDate(arrivals)
-              val flightsCount = arrivals.length
-//              val perFlight = if (flightsCount > 0) actPax.toDouble / flightsCount else 0
-//              val predPerFlight = if (flightsCount > 0) predPax.toDouble / flightsCount else 0
-              (predPax, actPax, flightsCount)
+            val predFn: Arrival => Int = stats.predictionForArrival(model)
+
+            stats.arrivalsForDate(date, terminal).map(_.filter(!_.Origin.isDomesticOrCta)).map {
+              arrivals =>
+                val predPax = stats.sumPredPaxForDate(arrivals, predFn)
+                val actPax = stats.sumActPaxForDate(arrivals)
+                val flightsCount = arrivals.length
+                (predPax, actPax, flightsCount)
             }
           }
           .collect { case (predPax, actPax, flightsCount) if flightsCount > 0 =>
             (predPax, actPax)
           }
           .runWith(Sink.seq)
-          .map(stats => (terminal, stats))
+          .map { stats =>
+            (terminal, stats)
+          }
       }
       .runForeach { case (terminal, results) =>
         val diffs = results.map { case (predPax, actPax) =>

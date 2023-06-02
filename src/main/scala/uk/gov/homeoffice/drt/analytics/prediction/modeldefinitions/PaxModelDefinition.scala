@@ -6,15 +6,14 @@ import akka.util.Timeout
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{WithId, Terminal => TerminalId}
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
-import uk.gov.homeoffice.drt.analytics.BankHolidays
 import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightsActor
-import uk.gov.homeoffice.drt.arrivals.Arrival
+import uk.gov.homeoffice.drt.arrivals.{Arrival, Passengers}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.ports.{ApiFeedSource, LiveFeedSource}
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.passengerCount
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns._
-import uk.gov.homeoffice.drt.prediction.arrival.PaxModelAndFeatures
-import uk.gov.homeoffice.drt.time.MilliTimes.oneDayMillis
+import uk.gov.homeoffice.drt.prediction.arrival.{ArrivalModelAndFeatures, PaxModelAndFeatures}
 import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike, UtcDate}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,47 +24,48 @@ object PaxModelDefinition extends ModelDefinition[Arrival, Terminal] {
 
   override val modelName: String = PaxModelAndFeatures.targetName
 
-  private val isBankHoliday: Long => Boolean = ts => BankHolidays.isHolidayWeekend(SDate(ts).toLocalDate)
-
-//  implicit val elapsedDays = (ts: Long) => ((SDate(ts).millisSinceEpoch - SDate("2022-04-01").millisSinceEpoch) / oneDayMillis).toInt
-
   override val features: List[Feature[Arrival]] = List(
-    //    BankHolidayWeekend(isBankHoliday),
-    Year(),
-    MonthOfYear(),
-    //    DayOfMonth(),
     ChristmasDay(),
-    SummerHalfTerm(),
-    SummerHoliday(),
     OctoberHalfTerm(),
     ChristmasHoliday(),
+    SpringHalfTerm(),
     EasterHoliday(),
-    //    Since6MonthsAgo(() => SDate.now()),
-    //    WeekendDay(),
+    SummerHalfTerm(),
+    SummerHoliday(),
     DayOfWeek(),
-    //    PartOfDay(),
     Carrier,
     Origin,
     FlightNumber,
-    //    ElapsedDays()
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalId.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = passengerCount(features)
   override val baselineValue: Terminal => Double = (_: Terminal) => 0d
 }
 
-object PaxModelStats {
-  private val log = LoggerFactory.getLogger(getClass)
+trait PaxModelStatsLike {
+  protected val log = LoggerFactory.getLogger(getClass)
 
-  def sumActPaxForDate(arrivals: Seq[Arrival])
-                      (implicit ec: ExecutionContext): Int =
+  def sumActPaxForDate(arrivals: Seq[Arrival]): Int =
     arrivals.map(_.bestPcpPaxEstimate.getOrElse(0)).sum
 
-  def sumPredPaxForDate(arrivals: Seq[Arrival], predPax: Arrival => Future[Int])
-                       (implicit ec: ExecutionContext): Future[Int] =
-    Future
-      .sequence(arrivals.map(a => predPax(a)))
-      .map(_.sum)
+  def sumPredPaxForDate(arrivals: Seq[Arrival], predPax: Arrival => Int): Int =
+    arrivals.map { a =>
+      val prediction = predPax(a)
+      val cap = (a.bestPcpPaxEstimate, a.MaxPax) match {
+        case (Some(actPax), Some(maxPax)) if maxPax > 0 =>
+          val pct = 100d * actPax / maxPax
+          f"$pct%.1f%%"
+        case _ => "n/a"
+      }
+      val diff = a.bestPcpPaxEstimate match {
+        case Some(actPax) if actPax > 0 =>
+          val pct = 100 * (prediction - actPax).toDouble / actPax
+          f"$pct%.1f%%"
+        case _ => "n/a"
+      }
+//      println(s"${a.Terminal},${a.flightCodeString},${SDate(a.Scheduled).toISOString},${a.bestPcpPaxEstimate.getOrElse("n/a")},$prediction,$diff,$cap")
+      prediction
+    }.sum
 
   def arrivalsForDate(date: UtcDate, terminal: Terminal)
                      (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Seq[Arrival]] = {
@@ -74,7 +74,11 @@ object PaxModelStats {
       .ask(GetState).mapTo[Seq[Arrival]]
       .map { arrivals =>
         actor ! PoisonPill
-        arrivals.filter(_.bestPcpPaxEstimate.isDefined)
+        arrivals.filter { arrival =>
+          arrival.PassengerSources.exists {
+            case (source, Passengers(maybePax, _)) => List(ApiFeedSource, LiveFeedSource).contains(source) && maybePax.isDefined
+          }
+        }
       }
       .recover {
         case t =>
@@ -84,12 +88,15 @@ object PaxModelStats {
       }
   }
 
-  def predictionForArrival(model: PaxModelAndFeatures)(arrival: Arrival)
-                          (implicit ec: ExecutionContext): Future[Int] =
-    Future.successful(model.prediction(arrival)
+  def predictionForArrival(model: ArrivalModelAndFeatures)(arrival: Arrival): Int
+}
+
+object PaxModelStats extends PaxModelStatsLike {
+  def predictionForArrival(model: ArrivalModelAndFeatures)(arrival: Arrival): Int =
+    model.prediction(arrival)
       .getOrElse({
-        val fallback = arrival.MaxPax.filter(_ > 0).map(_ * 0.8).getOrElse(175d)
-        log.warn(s"Using fallback prediction of $fallback for $arrival")
-        fallback.toInt
-      }))
+        val fallback = arrival.MaxPax.filter(_ > 0).map(_ * 0.8).getOrElse(175d).toInt
+        log.warn(s"Using fallback prediction of $fallback for ${arrival.flightCode} @ ${SDate(arrival.Scheduled).toISOString} with ${arrival.MaxPax} capacity")
+        fallback
+      })
 }

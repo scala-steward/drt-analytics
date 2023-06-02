@@ -25,8 +25,7 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDateLike) extends P
   var arrivals: mutable.Map[UniqueArrival, SimpleArrival] = mutable.Map()
 
   override def receiveRecover: Receive = {
-    case SnapshotOffer(md, FlightStateSnapshotMessage(flightMessages, _)) =>
-      println(s"Got SnapshotOffer from ${SDate(md.timestamp).toISOString}")
+    case SnapshotOffer(_, FlightStateSnapshotMessage(flightMessages, _)) =>
       arrivals ++= flightMessages
         .map(MessageConversion.fromFlightMessage)
         .map(a => (a.uniqueArrival, a))
