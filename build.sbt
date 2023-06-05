@@ -27,8 +27,8 @@ libraryDependencies ++= Seq(
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
-  "org.apache.spark" %% "spark-mllib" % sparkVersion,
-  "org.apache.spark" %% "spark-sql" % sparkVersion,
+  "org.apache.spark" %% "spark-mllib" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
+  "org.apache.spark" %% "spark-sql" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
   "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",
@@ -40,7 +40,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
-  "uk.gov.homeoffice" %% "drt-lib" % drtLib,
+  "uk.gov.homeoffice" %% "drt-lib" % drtLib excludeAll("org.scala-lang.modules", "scala-xml"),
   "org.typelevel" %% "cats-core" % catsVersion,
 )
 
