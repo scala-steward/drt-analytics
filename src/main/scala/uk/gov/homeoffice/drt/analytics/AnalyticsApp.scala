@@ -34,7 +34,7 @@ object AnalyticsApp extends App {
 
   implicit val system: ActorSystem = ActorSystem("DrtAnalytics")
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-  implicit val timeout: Timeout = new Timeout(5 seconds)
+  implicit val timeout: Timeout = new Timeout(30 seconds)
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   val portCode = PortCode(config.getString("port-code").toUpperCase)
@@ -43,19 +43,28 @@ object AnalyticsApp extends App {
   val noopPreProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]] = (_, a) => Future.successful(a)
 
   val populateMaxPax: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]] = (date, arrivals) => {
-    val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, date))
-    arrivalsActor
-      .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
-      .map { baseArrivals =>
-        arrivalsActor ! akka.actor.PoisonPill
+    val withMaxPaxPct = (100 * arrivals.values.count(_.MaxPax.isDefined).toDouble / arrivals.size).round
+    if (withMaxPaxPct < 80) {
+      log.info(s"Only $withMaxPaxPct% of arrivals have max pax for $date, populating")
+      val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, date))
+      arrivalsActor
+        .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
+        .map { baseArrivals =>
+          arrivalsActor ! akka.actor.PoisonPill
 
-        arrivals.view.mapValues {
-          arr =>
-            val maybeArrival = baseArrivals.arrivals.get(arr.unique)
-            val maybeMaxPax = maybeArrival.flatMap(_.maxPax)
-            arr.copy(MaxPax = maybeMaxPax)
-        }.toMap
-      }
+          arrivals.view.mapValues {
+            arr =>
+              val maybeArrival = baseArrivals.arrivals.get(arr.unique)
+              val maybeMaxPax = maybeArrival.flatMap(_.maxPax)
+              arr.copy(MaxPax = maybeMaxPax)
+          }.toMap
+        }
+        .recover {
+          case t =>
+            log.error(s"Failed to populate max pax for $date", t)
+            arrivals
+        }
+    } else Future.successful(arrivals)
   }
 
   AirportConfigs.confByPort.get(portCode) match {
