@@ -2,7 +2,7 @@ package uk.gov.homeoffice.drt.analytics
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike}
+import uk.gov.homeoffice.drt.time.LocalDate
 
 
 class BankHolidaysSpec extends AnyWordSpec with Matchers {
