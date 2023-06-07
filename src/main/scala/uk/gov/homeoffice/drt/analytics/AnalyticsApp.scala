@@ -34,7 +34,7 @@ object AnalyticsApp extends App {
 
   implicit val system: ActorSystem = ActorSystem("DrtAnalytics")
   implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-  implicit val timeout: Timeout = new Timeout(30 seconds)
+  implicit val timeout: Timeout = new Timeout(60 seconds)
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   val portCode = PortCode(config.getString("port-code").toUpperCase)
@@ -138,9 +138,9 @@ object AnalyticsApp extends App {
     val startDate = SDate.now().addDays(-days)
     val persistence = Flight()
 
-    import java.io._
-    val pw = new PrintWriter(new File(s"${portCode.iata.toLowerCase}-pax-cap.csv"))
-    pw.println(s"Date,Ternimal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Diff")
+//    import java.io._
+//    val pw = new PrintWriter(new File(s"${portCode.iata.toLowerCase}-pax-cap.csv"))
+//    pw.println(s"Date,Ternimal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Diff")
 
     Source(terminals.toList)
       .mapAsync(1) { terminal =>
@@ -173,13 +173,13 @@ object AnalyticsApp extends App {
             val diff = (predPax - actPax).toDouble / actPax * 100
             val actPaxPerFlight = actPax.toDouble / flightsCount
             val predPaxPerFlight = predPax.toDouble / flightsCount
-            pw.println(f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f")
+//            pw.println(f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f")
             log.info(s"Done $date")
             (predPax, actPax)
           }
           .runWith(Sink.seq)
           .map { stats =>
-            pw.close()
+//            pw.close()
             (terminal, stats)
           }
       }
