@@ -8,7 +8,6 @@ object ArrivalGenerator {
   def arrival(iata: String = "",
               icao: String = "",
               schDt: String = "",
-              actPax: Option[Int] = None,
               maxPax: Option[Int] = None,
               terminal: Terminal = T1,
               origin: PortCode = PortCode("JFK"),
@@ -22,20 +21,17 @@ object ArrivalGenerator {
               pcpDt: String = "",
               gate: Option[String] = None,
               stand: Option[String] = None,
-              tranPax: Option[Int] = None,
               runwayId: Option[String] = None,
               baggageReclaimId: Option[String] = None,
               airportId: PortCode = PortCode(""),
               feedSources: Set[FeedSource] = Set(),
-              apiPax: Option[Int] = None,
-              totalPax: Set[TotalPaxSource] = Set.empty[TotalPaxSource]
+              passengerSources: Map[FeedSource, Passengers] = Map.empty
              ): Arrival = {
     val pcpTime = if (pcpDt.nonEmpty) Option(SDate(pcpDt).millisSinceEpoch) else if (schDt.nonEmpty) Option(SDate(schDt).millisSinceEpoch) else None
 
     Arrival(
       rawICAO = icao,
       rawIATA = iata,
-      ActPax = actPax,
       Terminal = terminal,
       Origin = origin,
       Operator = operator,
@@ -48,22 +44,20 @@ object ArrivalGenerator {
       Gate = gate,
       Stand = stand,
       MaxPax = maxPax,
-      TranPax = tranPax,
       RunwayID = runwayId,
       BaggageReclaimId = baggageReclaimId,
       AirportID = airportId,
       PcpTime = pcpTime,
       Scheduled = if (schDt.nonEmpty) SDate(schDt).millisSinceEpoch else 0,
       FeedSources = feedSources,
-      ApiPax = apiPax,
-      TotalPax = totalPax
+      PassengerSources = passengerSources
     )
   }
 
   def flightWithSplitsForDayAndTerminal(date: SDateLike, terminal: Terminal = T1): ApiFlightWithSplits = ApiFlightWithSplits(
-    ArrivalGenerator.arrival(schDt = date.toISOString(), terminal = terminal), Set(), Option(date.millisSinceEpoch)
+    ArrivalGenerator.arrival(schDt = date.toISOString, terminal = terminal), Set(), Option(date.millisSinceEpoch)
   )
 
   def arrivalForDayAndTerminal(date: SDateLike, terminal: Terminal = T1): Arrival =
-    ArrivalGenerator.arrival(schDt = date.toISOString(), terminal = terminal)
+    ArrivalGenerator.arrival(schDt = date.toISOString, terminal = terminal)
 }

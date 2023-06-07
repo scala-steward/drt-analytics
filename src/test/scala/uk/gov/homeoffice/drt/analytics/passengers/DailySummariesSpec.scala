@@ -6,6 +6,8 @@ import akka.testkit.TestKit
 import org.specs2.mutable.SpecificationLike
 import uk.gov.homeoffice.drt.analytics.actors.{FeedPersistenceIds, GetArrivals}
 import uk.gov.homeoffice.drt.analytics.{Arrivals, DailyPaxCountsOnDay, SimpleArrival}
+import uk.gov.homeoffice.drt.arrivals.Passengers
+import uk.gov.homeoffice.drt.ports.{ForecastFeedSource, LiveFeedSource}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.duration._
@@ -28,8 +30,10 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
   val livePid: String = FeedPersistenceIds.live
   val forecastPid: String = FeedPersistenceIds.forecastBase
   val date: SDateLike = SDate("2020-01-01")
-  val forecastArrival: SimpleArrival = SimpleArrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched", 100, 0)
-  val liveArrival: SimpleArrival = SimpleArrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched", 50, 0)
+  val forecastArrival: SimpleArrival = SimpleArrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched",
+    Map(ForecastFeedSource -> Passengers(Option(100), Option(0))))
+  val liveArrival: SimpleArrival = SimpleArrival("BA", 1, date.millisSinceEpoch, "T1", "JFK", "sched",
+    Map(LiveFeedSource -> Passengers(Option(50), Option(0))))
 
   "Given a sourcePersistenceId, and props for a mock actor with an arrival" >> {
     val props = MockArrivalsActor.props
@@ -75,7 +79,8 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
       "I should get a map of the arrival's origin to a DailyPaxCountOnDay containing 1 day with the pax from the 1 arrival" >> {
         val summaries = Await.result(DailySummaries.dailyPaxCountsForDayByOrigin(date, date, 1, "T1", Future(genArrivals(Seq(liveArrival)).arrivals)), 1.second)
 
-        summaries === Map(liveArrival.origin -> DailyPaxCountsOnDay(date.millisSinceEpoch, Map(date.millisSinceEpoch -> liveArrival.actPax)))
+        summaries === Map(liveArrival.origin ->
+          DailyPaxCountsOnDay(date.millisSinceEpoch, Map(date.millisSinceEpoch -> liveArrival.bestPaxEstimate.getPcpPax.getOrElse(0))))
       }
     }
 
@@ -83,7 +88,8 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
       "I should get a map of the arrival's origin to a DailyPaxCountOnDay containing just one day as the next doesn't have any pax" >> {
         val summaries = Await.result(DailySummaries.dailyPaxCountsForDayByOrigin(date, date, 2, "T1", Future(genArrivals(Seq(liveArrival)).arrivals)), 1.second)
 
-        summaries === Map(liveArrival.origin -> DailyPaxCountsOnDay(date.millisSinceEpoch, Map(date.millisSinceEpoch -> liveArrival.actPax)))
+        summaries === Map(liveArrival.origin ->
+          DailyPaxCountsOnDay(date.millisSinceEpoch, Map(date.millisSinceEpoch -> liveArrival.bestPaxEstimate.getPcpPax.getOrElse(0))))
       }
     }
   }
@@ -92,9 +98,12 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
     "When I ask for the daily summary for the day when the arrival is scheduled for" >> {
       "I should get a map of the arrival's origin to a DailyPaxCountOnDay containing 1 day with the total pax from the 2 arrivals" >> {
         val arrival2 = liveArrival.copy(number = 2)
-        val summaries = Await.result(DailySummaries.dailyPaxCountsForDayByOrigin(date, date, 1, "T1", Future(genArrivals(Seq(liveArrival, arrival2)).arrivals)), 1.second)
+        val summaries = Await
+          .result(DailySummaries.dailyPaxCountsForDayByOrigin(date, date, 1, "T1", Future(genArrivals(Seq(liveArrival, arrival2)).arrivals)), 1.second)
 
-        summaries === Map(liveArrival.origin -> DailyPaxCountsOnDay(date.millisSinceEpoch, Map(date.millisSinceEpoch -> (liveArrival.actPax + arrival2.actPax))))
+        summaries === Map(liveArrival.origin -> DailyPaxCountsOnDay(date.millisSinceEpoch,
+          Map(date.millisSinceEpoch -> (liveArrival.bestPaxEstimate.getPcpPax.getOrElse(0) +
+            arrival2.bestPaxEstimate.getPcpPax.getOrElse(0)))))
       }
     }
   }
@@ -102,9 +111,12 @@ class DailySummariesSpec extends TestKit(ActorSystem("passengers-actor")) with S
   "Given 2 arrivals scheduled for the same day, each with 100 pax and 10 transit pax" >> {
     "When I ask for the daily summary for the day when the arrival is scheduled for" >> {
       "I should get a map of the arrival's origin to a DailyPaxCountOnDay containing 1 day with the total pax from the 2 arrivals minus the transit pax" >> {
-        val arrival = liveArrival.copy(actPax = 100, transPax = 10)
-        val arrival2 = liveArrival.copy(number = 2, actPax = 100, transPax = 10)
-        val summaries = Await.result(DailySummaries.dailyPaxCountsForDayByOrigin(date, date, 1, "T1", Future(genArrivals(Seq(arrival, arrival2)).arrivals)), 1.second)
+        val arrival = liveArrival
+          .copy(passengerSources = Map(LiveFeedSource -> Passengers(Option(100), Option(10))))
+        val arrival2 = liveArrival
+          .copy(number = 2, passengerSources = Map(LiveFeedSource -> Passengers(Option(100), Option(10))))
+        val summaries = Await.result(DailySummaries
+          .dailyPaxCountsForDayByOrigin(date, date, 1, "T1", Future(genArrivals(Seq(arrival, arrival2)).arrivals)), 1.second)
 
         summaries === Map(liveArrival.origin -> DailyPaxCountsOnDay(date.millisSinceEpoch, Map(date.millisSinceEpoch -> (100 * 2 - 10 * 2))))
       }

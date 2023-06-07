@@ -45,8 +45,8 @@ object DailySummaries {
           log.info(s"Applying ${supplementalArrivals.size} $source to ${arrivalsSoFar.size} existing arrivals")
           arrivalsSoFar.view.mapValues { arrival =>
             supplementalArrivals.get(arrival.uniqueArrival) match {
-              case Some(suppArr) if suppArr.actPax > 0 =>
-                arrival.copy(actPax = suppArr.actPax, transPax = suppArr.transPax)
+              case Some(suppArr) if suppArr.bestPaxEstimate.getPcpPax.getOrElse(0) > 0 =>
+                arrival.copy(passengerSources = suppArr.passengerSources)
               case _ => arrival
             }
           }.toMap
@@ -72,7 +72,7 @@ object DailySummaries {
               SDate(a.scheduled, DateTimeZone.forID("Europe/London")).toISODateOnly
             }
             .mapValues {
-              _.map(a => a.actPax - a.transPax).sum
+              _.map(a => a.bestPaxEstimate.getPcpPax.getOrElse(0)).sum
             }
 
           val paxByDay = (0 to numberOfDays)

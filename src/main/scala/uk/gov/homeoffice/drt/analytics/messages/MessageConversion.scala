@@ -1,7 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.messages
 
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.FlightMessage
 import uk.gov.homeoffice.drt.analytics.SimpleArrival
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.FlightMessage
+import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion
 
 import scala.util.matching.Regex
 
@@ -24,7 +25,6 @@ object MessageConversion {
       fm.terminal.getOrElse(""),
       fm.origin.getOrElse(""),
       fm.status.getOrElse(""),
-      fm.actPax.getOrElse(0),
-      fm.tranPax.getOrElse(0))
+      FlightMessageConversion.getPassengerSources(fm))
   }
 }

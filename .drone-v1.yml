@@ -14,6 +14,7 @@ steps:
     commands:
       - /root/entrypoint.sh
       - sbt -ivy ./.ivy2 dependencyCheck
+      - sbt -ivy ./.ivy2 -mem 4096 -J-XX:+UseG1GC clean coverage test coverageReport
       - sbt scalastyle | true
       - sbt scapegoat | true
     environment:
@@ -27,7 +28,7 @@ steps:
 
   - name: sonar-scanner
     pull: if-not-exists
-    image: quay.io/ukhomeofficedigital/sonar-scanner:v3.0.1
+    image: quay.io/ukhomeofficedigital/sonar-scanner:v4.6
     commands:
       - sonar-scanner -Dsonar.projectVersion=B${DRONE_BUILD_NUMBER}
     environment:
