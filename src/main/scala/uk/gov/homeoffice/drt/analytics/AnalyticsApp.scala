@@ -2,18 +2,17 @@ package uk.gov.homeoffice.drt.analytics
 
 import akka.Done
 import akka.actor.ActorSystem
-import akka.pattern.ask
-import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.actor.PredictionModelActor
+import software.amazon.awssdk.services.s3.S3AsyncClient
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
-import uk.gov.homeoffice.drt.analytics.actors.{ArrivalsActor, FeedPersistenceIds, GetArrivals}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions._
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
-//import uk.gov.homeoffice.drt.analytics.services.PassengerCounts
+import uk.gov.homeoffice.drt.analytics.s3.Utils
+import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.{noopPreProcess, populateMaxPax}
+import uk.gov.homeoffice.drt.analytics.services.ModelAccuracy
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
@@ -37,35 +36,10 @@ object AnalyticsApp extends App {
   implicit val timeout: Timeout = new Timeout(60 seconds)
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
-  val portCode = PortCode(config.getString("port-code").toUpperCase)
-  val daysOfTrainingData = config.getInt("options.training.days-of-data")
-
-  val noopPreProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]] = (_, a) => Future.successful(a)
-
-  val populateMaxPax: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]] = (date, arrivals) => {
-    val withMaxPaxPct = (100 * arrivals.values.count(_.MaxPax.isDefined).toDouble / arrivals.size).round
-    if (withMaxPaxPct < 80) {
-      log.info(s"Only $withMaxPaxPct% of arrivals have max pax for $date, populating")
-      val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, date))
-      arrivalsActor
-        .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
-        .map { baseArrivals =>
-          arrivalsActor ! akka.actor.PoisonPill
-
-          arrivals.view.mapValues {
-            arr =>
-              val maybeArrival = baseArrivals.arrivals.get(arr.unique)
-              val maybeMaxPax = maybeArrival.flatMap(_.maxPax)
-              arr.copy(MaxPax = maybeMaxPax)
-          }.toMap
-        }
-        .recover {
-          case t =>
-            log.error(s"Failed to populate max pax for $date", t)
-            arrivals
-        }
-    } else Future.successful(arrivals)
-  }
+  private val portCode = PortCode(config.getString("port-code").toUpperCase)
+  private val daysOfTrainingData = config.getInt("options.training.days-of-data")
+  implicit val s3AsyncClient: S3AsyncClient = Utils.s3AsyncClient(config.getString("aws.access-key-id"), config.getString("aws.secret-access-key"))
+  private val bucketName = config.getString("aws.s3.bucket")
 
   AirportConfigs.confByPort.get(portCode) match {
     case None =>
@@ -96,12 +70,12 @@ object AnalyticsApp extends App {
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals, noopPreProcess)
 
         case "update-pax-cap-models" =>
-          trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax).flatMap { _ =>
-            dumpDailyPax(daysOfTrainingData, portConfig.terminals, PaxCapModelStats, paxCapModelCollector)
+          trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax()).flatMap { _ =>
+            ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, PaxCapModelStats, paxCapModelCollector, bucketName)
           }
 
         case "dump-daily-pax-cap" =>
-          dumpDailyPax(daysOfTrainingData, portConfig.terminals, PaxCapModelStats, paxCapModelCollector)
+          ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, PaxCapModelStats, paxCapModelCollector, bucketName)
 
         case unknown =>
           log.error(s"Unknown job name '$unknown'")
@@ -112,7 +86,7 @@ object AnalyticsApp extends App {
       System.exit(0)
   }
 
-  def paxCapModelCollector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures] = _.collect {
+  private def paxCapModelCollector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures] = _.collect {
     case m: PaxCapModelAndFeatures => m
   }
 
@@ -132,73 +106,5 @@ object AnalyticsApp extends App {
 
     FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
       .trainTerminals(terminals.toList)
-  }
-
-  private def dumpDailyPax(days: Int, terminals: Iterable[Terminal], stats: PaxModelStatsLike, collector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures]): Future[Done] = {
-    val startDate = SDate.now().addDays(-days)
-    val persistence = Flight()
-
-//    import java.io._
-//    val pw = new PrintWriter(new File(s"${portCode.iata.toLowerCase}-pax-cap.csv"))
-//    pw.println(s"Date,Ternimal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Diff")
-
-    Source(terminals.toList)
-      .mapAsync(1) { terminal =>
-        val terminalId = PredictionModelActor.Terminal(terminal.toString)
-        persistence.getModels(terminalId).map(models => (terminal, models))
-      }
-      .map { case (terminal, models) =>
-        (terminal, collector(models.models.values))
-      }
-      .collect {
-        case (terminal, model) => (terminal, model.head)
-      }
-      .mapAsync(1) { case (terminal, model) =>
-        Source((0 to days).toList)
-          .mapAsync(1) { daysAgo =>
-            val date = startDate.addDays(daysAgo).toUtcDate
-            val predFn: Arrival => Int = stats.predictionForArrival(model)
-
-            stats.arrivalsForDate(date, terminal, populateMaxPax).map(_.filter(!_.Origin.isDomesticOrCta)).map {
-              arrivals =>
-                val predPax = stats.sumPredPaxForDate(arrivals, predFn)
-                val actPax = stats.sumActPaxForDate(arrivals)
-                val predPctCap = stats.sumPredPctCapForDate(arrivals, predFn)
-                val actPctCap = stats.sumActPctCapForDate(arrivals)
-                val flightsCount = arrivals.length
-                (date, predPax, actPax, flightsCount, predPctCap, actPctCap)
-            }
-          }
-          .collect { case (date, predPax, actPax, flightsCount, predPctCap, actPctCap) if flightsCount > 0 =>
-            val diff = (predPax - actPax).toDouble / actPax * 100
-            val actPaxPerFlight = actPax.toDouble / flightsCount
-            val predPaxPerFlight = predPax.toDouble / flightsCount
-//            pw.println(f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f")
-            log.info(s"Done $date")
-            (predPax, actPax)
-          }
-          .runWith(Sink.seq)
-          .map { stats =>
-//            pw.close()
-            (terminal, stats)
-          }
-      }
-      .runForeach { case (terminal, results) =>
-        val diffs = results.map { case (predPax, actPax) =>
-          predPax - actPax
-        }
-        val minDiff = results.minBy { case (predPax, actPax) =>
-          predPax - actPax
-        }
-        val maxDiff = results.maxBy { case (predPax, actPax) =>
-          predPax - actPax
-        }
-        val min = (minDiff._1 - minDiff._2).toDouble / minDiff._2 * 100
-        val max = (maxDiff._1 - maxDiff._2).toDouble / maxDiff._2 * 100
-        val rmse = Math.sqrt(diffs.map(d => d * d).sum / diffs.length)
-        val meanPax = results.map(_._2).sum / results.length
-        val rmsePercent = rmse / meanPax * 100
-        log.info(f"Terminal $terminal: Mean daily pax: $meanPax, RMSE: $rmse%.2f ($rmsePercent%.1f%%), min: $min%.1f%%, max: $max%.1f%%")
-      }
   }
 }

@@ -58,7 +58,7 @@ case class FlightRouteValuesTrainer(modelName: String,
   }
 
   private def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
-                   (implicit mat: Materializer): Future[Seq[Option[Double]]] = {
+                   (implicit mat: Materializer, executionContext: ExecutionContext): Future[Seq[Option[Double]]] = {
     implicit val session: SparkSession = SparkSession
       .builder
       .appName("DRT Analytics")
@@ -95,6 +95,10 @@ case class FlightRouteValuesTrainer(modelName: String,
           }
       }
       .runWith(Sink.seq)
+      .map { result =>
+        session.stop()
+        result
+      }
   }
 
   private def calculateImprovementPct(dataSet: DataSet,

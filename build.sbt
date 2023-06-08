@@ -19,6 +19,7 @@ lazy val specs2Version = "4.19.2"
 lazy val sparkVersion = "3.3.2"
 lazy val scalaTestVersion = "3.2.15"
 lazy val catsVersion = "2.9.0"
+lazy val awsJava2SdkVersion = "2.13.73"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -42,6 +43,7 @@ libraryDependencies ++= Seq(
   "org.specs2" %% "specs2-core" % specs2Version % Test,
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
+  "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
 )
 
 lazy val root = (project in file("."))
