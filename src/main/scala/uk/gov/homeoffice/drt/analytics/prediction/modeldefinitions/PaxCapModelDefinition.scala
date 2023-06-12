@@ -26,11 +26,17 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
 
   override val features: List[Feature[Arrival]] = List(
     ChristmasDay(),
+    Term1a(),
     OctoberHalfTerm(),
+    Term1b(),
     ChristmasHoliday(),
+    Term2a(),
     SpringHalfTerm(),
+    Term2b(),
     EasterHoliday(),
+    Term3a(),
     SummerHalfTerm(),
+    Term3b(),
     SummerHoliday(),
     DayOfWeek(),
     Carrier,
