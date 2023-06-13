@@ -46,20 +46,25 @@ object ModelAccuracy {
         persistence.getModels(terminalId).map(models => (terminal, models))
       }
       .map { case (terminal, models) =>
-        (terminal, collector(models.models.values))
+        val modelsAndFeatures = collector(models.models.values)
+        (terminal, modelsAndFeatures)
       }
       .collect {
-        case (terminal, model) => (terminal, model.head)
+        case (terminal, models) =>
+          println(s"$terminal ${models.size} models")
+          val model = models.head
+          (terminal, model)
       }
       .mapAsync(1) { case (terminal, model) =>
         Source((0 to days).toList)
-          .mapAsync(1)(daysAgo => statsForDate(statsHelper, startDate, terminal, model, daysAgo))
+          .mapAsync(1) { daysAgo =>
+            statsForDate(statsHelper, startDate, terminal, model, daysAgo)
+          }
           .collect { case (date, predPax, actPax, flightsCount, predPctCap, actPctCap) if flightsCount > 0 =>
             val diff = (predPax - actPax).toDouble / actPax * 100
             val actPaxPerFlight = actPax.toDouble / flightsCount
             val predPaxPerFlight = predPax.toDouble / flightsCount
             val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f"
-            log.info(s"Done $date")
             (predPax, actPax, csvRow)
           }
           .runWith(Sink.seq)

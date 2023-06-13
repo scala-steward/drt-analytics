@@ -74,14 +74,16 @@ case class FlightRouteValuesTrainer(modelName: String,
     log.info(s"Training $modelName for $terminal with $daysOfData days of data, $trainingSetPct% training, $validationSetPct% validation")
 
     examplesProvider(terminal, start, daysOfData)
-      .map {
+      .mapAsync(1) {
         case (modelIdentifier, allExamples) =>
           val withIndex = allExamples.zipWithIndex
           val dataFrame = prepareDataFrame(featureColumnNames, withIndex)
           removeOutliers(dataFrame) match {
             case examples if examples.count() <= 5 =>
-              persistence.updateModel(modelIdentifier, modelName, None)
-              None
+              persistence
+                .updateModel(modelIdentifier, modelName, None)
+                .map(_ => None)
+
             case withoutOutliers =>
               log.info(s"Training $modelName for $modelIdentifier with ${withoutOutliers.count()} out of ${allExamples.size} examples after outlier removal")
               val trainingExamples = (allExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
@@ -90,8 +92,9 @@ case class FlightRouteValuesTrainer(modelName: String,
               val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct, baselineValue(terminal))
               val regressionModel = RegressionModelFromSpark(lrModel)
               val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
-              persistence.updateModel(modelIdentifier, modelName, Option(modelUpdate))
-              Some(improvementPct)
+              persistence
+                .updateModel(modelIdentifier, modelName, Option(modelUpdate))
+                .map(_ => Some(improvementPct))
           }
       }
       .runWith(Sink.seq)
