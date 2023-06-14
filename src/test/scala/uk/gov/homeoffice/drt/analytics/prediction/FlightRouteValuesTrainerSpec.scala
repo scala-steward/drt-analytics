@@ -63,12 +63,11 @@ class FlightRouteValuesTrainerSpec
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
     }
 
-    "Send a ModelUpdate when there are enough training examples" in {
-      skipped("The trainer needs refactoring to be testable - remove the spark session dependency")
-      val probe = TestProbe("test-probe")
-      getTrainer(examples(10), probe.ref).trainTerminals(List(T2))
-      probe.expectMsg(60.seconds, "model update")
-    }
+//    "Send a ModelUpdate when there are enough training examples" in {
+//      val probe = TestProbe("test-probe")
+//      getTrainer(examples(10), probe.ref).trainTerminals(List(T2))
+//      probe.expectMsg(60.seconds, "model update")
+//    }
   }
 
   private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double])], probe: ActorRef): FlightRouteValuesTrainer = {
