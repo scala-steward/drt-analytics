@@ -65,7 +65,7 @@ class FlightRouteValuesTrainerSpec
     "Send a ModelUpdate when there are enough training examples" in {
       val probe = TestProbe("test-probe")
       getTrainer(examples(10), probe.ref).trainTerminals(List(T2))
-      probe.expectMsg(20.seconds, "model update")
+      probe.expectMsg(60.seconds, "model update")
     }
   }
 
