@@ -48,7 +48,6 @@ class FlightsActor(val terminal: Terminal,
     case FlightsWithSplitsDiffMessage(Some(createdAt), removals, updates) =>
       maybePointInTime match {
         case Some(time) if createdAt > time =>
-          log.info(s"Skipping replay of FlightsWithSplitsDiffMessage at $createdAt as it's after the point in time ${SDate(time).toISOString}")
         case _ =>
           updates.foreach(processFlightsWithSplitsMessage)
           if (SDate(createdAt) < SDate(date).addHours(28)) {
