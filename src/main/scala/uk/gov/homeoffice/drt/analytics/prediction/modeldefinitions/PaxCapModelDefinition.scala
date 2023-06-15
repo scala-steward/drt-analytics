@@ -99,9 +99,14 @@ trait PaxModelStatsLike {
   def arrivalsForDate(date: UtcDate,
                       terminal: Terminal,
                       populateMaxPax: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
-                      maybeForecastAheadDays: Option[Int] = None
+                      maybeForecastAheadDays: Option[Int] = None,
+                      expectedFeeds: List[Any]
                      )
-                     (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Seq[Arrival]] = {
+                     (implicit
+                      system: ActorSystem,
+                      ec: ExecutionContext,
+                      timeout: Timeout
+                     ): Future[Seq[Arrival]] = {
     val maybePointInTime = maybeForecastAheadDays.map(d => SDate(date).addDays(-d).millisSinceEpoch)
     val actor = system.actorOf(Props(classOf[FlightsActor], terminal, date, maybePointInTime))
     actor
@@ -111,9 +116,11 @@ trait PaxModelStatsLike {
         val filtered = arrivals
           .filterNot(a => a.Origin.isDomesticOrCta)
           .filter { arrival =>
-            arrival.PassengerSources.exists {
-              case (source, Passengers(maybePax, _)) => List(ApiFeedSource, LiveFeedSource).contains(source) && maybePax.isDefined
-            }
+            if (expectedFeeds.nonEmpty)
+              arrival.PassengerSources.exists {
+                case (source, Passengers(maybePax, _)) => expectedFeeds.contains(source) && maybePax.isDefined
+              }
+            else true
           }
         val filteredMap = filtered.map(a => (ArrivalKey(a.Scheduled, a.Terminal.toString, a.VoyageNumber.numeric), a))
         populateMaxPax(date, filteredMap.toMap).map(_.values.toSeq)

@@ -11,6 +11,7 @@ import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.PaxModelStats
 import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.populateMaxPax
 import uk.gov.homeoffice.drt.arrivals.Arrival
+import uk.gov.homeoffice.drt.ports.{ApiFeedSource, LiveFeedSource}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.ModelAndFeatures
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalModelAndFeatures
@@ -93,9 +94,9 @@ object ModelAccuracy {
     val date = startDate.addDays(daysAgo).toUtcDate
     val predFn: Arrival => Int = stats.predictionForArrival(model)
 
-    stats.arrivalsForDate(date, terminal, populateMaxPax).map(_.filter(!_.Origin.isDomesticOrCta)).flatMap {
+    stats.arrivalsForDate(date, terminal, populateMaxPax, expectedFeeds = List(ApiFeedSource, LiveFeedSource)).map(_.filter(!_.Origin.isDomesticOrCta)).flatMap {
       arrivals =>
-        stats.arrivalsForDate(date, terminal, populateMaxPax, Option(7)).map(_.filter(!_.Origin.isDomesticOrCta)).map {
+        stats.arrivalsForDate(date, terminal, populateMaxPax, Option(7), List()).map(_.filter(!_.Origin.isDomesticOrCta)).map {
           fArrivals =>
             val predPax = stats.sumPredPaxForDate(arrivals, predFn)
             val actPax = stats.sumActPaxForDate(arrivals)
