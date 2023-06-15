@@ -102,7 +102,7 @@ trait PaxModelStatsLike {
                       maybeForecastAheadDays: Option[Int] = None
                      )
                      (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Seq[Arrival]] = {
-    val maybePointInTime = maybeForecastAheadDays.map(d => SDate(date).addDays(d).millisSinceEpoch)
+    val maybePointInTime = maybeForecastAheadDays.map(d => SDate(date).addDays(-d).millisSinceEpoch)
     val actor = system.actorOf(Props(classOf[FlightsActor], terminal, date, maybePointInTime))
     actor
       .ask(GetState).mapTo[Seq[Arrival]]
