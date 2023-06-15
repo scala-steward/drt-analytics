@@ -82,7 +82,7 @@ object AnalyticsApp extends App {
           Future.successful(Done)
       }
 
-      Await.ready(eventualUpdates, 30 minutes)
+      Await.ready(eventualUpdates, 60 minutes)
       System.exit(0)
   }
 
