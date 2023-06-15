@@ -38,7 +38,7 @@ object ModelAccuracy {
     val startDate = SDate.now().addDays(-days)
     val persistence = Flight()
 
-    val csvHeader = s"Date,Terminal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Diff %"
+    val csvHeader = s"Date,Terminal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Diff %,Fcst pax, Fcst % cap"
 
     Source(terminals.toList)
       .mapAsync(1) { terminal =>
@@ -51,7 +51,6 @@ object ModelAccuracy {
       }
       .collect {
         case (terminal, models) =>
-          println(s"$terminal ${models.size} models")
           val model = models.head
           (terminal, model)
       }
@@ -60,11 +59,11 @@ object ModelAccuracy {
           .mapAsync(1) { daysAgo =>
             statsForDate(statsHelper, startDate, terminal, model, daysAgo)
           }
-          .collect { case (date, predPax, actPax, flightsCount, predPctCap, actPctCap) if flightsCount > 0 =>
+          .collect { case (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap) if flightsCount > 0 =>
             val diff = (predPax - actPax).toDouble / actPax * 100
             val actPaxPerFlight = actPax.toDouble / flightsCount
             val predPaxPerFlight = predPax.toDouble / flightsCount
-            val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f"
+            val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f,$fcstPax,$fcstPctCap%.2f"
             (predPax, actPax, csvRow)
           }
           .runWith(Sink.seq)
@@ -90,18 +89,23 @@ object ModelAccuracy {
                             implicit ec: ExecutionContext,
                             system: ActorSystem,
                             timeout: Timeout
-                          ): Future[(UtcDate, Int, Int, Int, Double, Double)] = {
+                          ): Future[(UtcDate, Int, Int, Int, Int, Double, Double, Double)] = {
     val date = startDate.addDays(daysAgo).toUtcDate
     val predFn: Arrival => Int = stats.predictionForArrival(model)
 
-    stats.arrivalsForDate(date, terminal, populateMaxPax).map(_.filter(!_.Origin.isDomesticOrCta)).map {
+    stats.arrivalsForDate(date, terminal, populateMaxPax).map(_.filter(!_.Origin.isDomesticOrCta)).flatMap {
       arrivals =>
-        val predPax = stats.sumPredPaxForDate(arrivals, predFn)
-        val actPax = stats.sumActPaxForDate(arrivals)
-        val predPctCap = stats.sumPredPctCapForDate(arrivals, predFn)
-        val actPctCap = stats.sumActPctCapForDate(arrivals)
-        val flightsCount = arrivals.length
-        (date, predPax, actPax, flightsCount, predPctCap, actPctCap)
+        stats.arrivalsForDate(date, terminal, populateMaxPax, Option(7)).map(_.filter(!_.Origin.isDomesticOrCta)).map {
+          fArrivals =>
+            val predPax = stats.sumPredPaxForDate(arrivals, predFn)
+            val actPax = stats.sumActPaxForDate(arrivals)
+            val fcstPax = stats.sumActPaxForDate(fArrivals)
+            val predPctCap = stats.sumPredPctCapForDate(arrivals, predFn)
+            val actPctCap = stats.sumActPctCapForDate(arrivals)
+            val fcstPctCap = stats.sumActPctCapForDate(fArrivals)
+            val flightsCount = arrivals.length
+            (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap)
+        }
     }
   }
 

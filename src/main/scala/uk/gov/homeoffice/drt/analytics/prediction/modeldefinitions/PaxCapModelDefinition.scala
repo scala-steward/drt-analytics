@@ -96,9 +96,14 @@ trait PaxModelStatsLike {
     total / arrivals.size
   }
 
-  def arrivalsForDate(date: UtcDate, terminal: Terminal, populateMaxPax: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]])
+  def arrivalsForDate(date: UtcDate,
+                      terminal: Terminal,
+                      populateMaxPax: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
+                      maybeForecastAheadDays: Option[Int] = None
+                     )
                      (implicit system: ActorSystem, ec: ExecutionContext, timeout: Timeout): Future[Seq[Arrival]] = {
-    val actor = system.actorOf(Props(classOf[FlightsActor], terminal, date))
+    val maybePointInTime = maybeForecastAheadDays.map(d => SDate(date).addDays(d).millisSinceEpoch)
+    val actor = system.actorOf(Props(classOf[FlightsActor], terminal, date, maybePointInTime))
     actor
       .ask(GetState).mapTo[Seq[Arrival]]
       .flatMap { arrivals =>

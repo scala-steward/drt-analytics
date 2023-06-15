@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
-import akka.persistence.{PersistentActor, SnapshotOffer}
+import akka.persistence.{PersistentActor, Recovery, SnapshotOffer, SnapshotSelectionCriteria}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.arrivals.Arrival
@@ -15,6 +15,7 @@ import scala.util.Try
 
 class FlightsActor(val terminal: Terminal,
                    val date: UtcDate,
+                   val maybePointInTime: Option[Long],
                   ) extends PersistentActor {
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -29,6 +30,14 @@ class FlightsActor(val terminal: Terminal,
     }
   }
 
+  override def recovery: Recovery = maybePointInTime match {
+    case None =>
+      Recovery(SnapshotSelectionCriteria(Long.MaxValue, maxTimestamp = Long.MaxValue, 0L, 0L))
+    case Some(pointInTime) =>
+      val criteria = SnapshotSelectionCriteria(maxTimestamp = pointInTime)
+      Recovery(fromSnapshot = criteria, replayMax = 250)
+  }
+
   override def receiveRecover: Receive = {
     case SnapshotOffer(_, ss) =>
       ss match {
@@ -37,6 +46,10 @@ class FlightsActor(val terminal: Terminal,
       }
 
     case FlightsWithSplitsDiffMessage(Some(createdAt), removals, updates) =>
+      maybePointInTime match {
+        case Some(time) if createdAt > time =>
+          log.debug(s"Skipping replay of FlightsWithSplitsDiffMessage at $createdAt as it's after the point in time $time")
+      }
       updates.foreach(processFlightsWithSplitsMessage)
       if (SDate(createdAt) < SDate(date).addHours(28)) {
         if (removals.length < byArrivalKey.size)
