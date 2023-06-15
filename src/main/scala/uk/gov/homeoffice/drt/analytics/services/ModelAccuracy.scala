@@ -39,7 +39,7 @@ object ModelAccuracy {
     val startDate = SDate.now().addDays(-days)
     val persistence = Flight()
 
-    val csvHeader = s"Date,Terminal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Diff %,Fcst pax, Fcst % cap"
+    val csvHeader = s"Date,Terminal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Pred diff %,Fcst pax, Fcst % cap, Fcst diff %"
 
     Source(terminals.toList)
       .mapAsync(1) { terminal =>
@@ -61,10 +61,11 @@ object ModelAccuracy {
             statsForDate(statsHelper, startDate, terminal, model, daysAgo)
           }
           .collect { case (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap) if flightsCount > 0 =>
-            val diff = (predPax - actPax).toDouble / actPax * 100
+            val predDiff = (predPax - actPax).toDouble / actPax * 100
+            val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
             val actPaxPerFlight = actPax.toDouble / flightsCount
             val predPaxPerFlight = predPax.toDouble / flightsCount
-            val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$diff%.2f,$fcstPax,$fcstPctCap%.2f"
+            val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$predDiff%.2f,$fcstPax,$fcstPctCap%.2f,$fcstDiff%.2f"
             (predPax, actPax, csvRow)
           }
           .runWith(Sink.seq)
