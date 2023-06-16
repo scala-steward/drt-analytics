@@ -56,9 +56,9 @@ object ModelAccuracy {
           (terminal, model)
       }
       .mapAsync(1) { case (terminal, model) =>
-        Source((0 to days).toList)
-          .mapAsync(1) { daysAgo =>
-            statsForDate(statsHelper, startDate, terminal, model, daysAgo)
+        Source((0 until days).toList)
+          .mapAsync(1) { day =>
+            statsForDate(statsHelper, startDate, terminal, model, day)
           }
           .collect { case (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap) if flightsCount > 0 =>
             val predDiff = (predPax - actPax).toDouble / actPax * 100
@@ -86,13 +86,13 @@ object ModelAccuracy {
                            startDate: SDateLike,
                            terminal: Terminal,
                            model: ArrivalModelAndFeatures,
-                           daysAgo: Int,
+                           day: Int,
                           )(
                             implicit ec: ExecutionContext,
                             system: ActorSystem,
                             timeout: Timeout
                           ): Future[(UtcDate, Int, Int, Int, Int, Double, Double, Double)] = {
-    val date = startDate.addDays(daysAgo).toUtcDate
+    val date = startDate.addDays(day).toUtcDate
     val predFn: Arrival => Int = stats.predictionForArrival(model)
 
     stats.arrivalsForDate(date, terminal, populateMaxPax, expectedFeeds = List(ApiFeedSource, LiveFeedSource)).map(_.filter(!_.Origin.isDomesticOrCta)).flatMap {
