@@ -105,7 +105,8 @@ steps:
 #        - failure
       event:
         - push
-#    depends_on:
-#      - Publish
+    depends_on:
+      - Test back end
+      - Publish
 
 ...
