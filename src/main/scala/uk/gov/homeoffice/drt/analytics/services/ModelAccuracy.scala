@@ -66,7 +66,7 @@ object ModelAccuracy {
             val actPaxPerFlight = actPax.toDouble / flightsCount
             val predPaxPerFlight = predPax.toDouble / flightsCount
             val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$predDiff%.2f,$fcstPax,$fcstPctCap%.2f,$fcstDiff%.2f"
-            (predPax, actPax, csvRow)
+            (predPax, fcstPax, actPax, csvRow)
           }
           .runWith(Sink.seq)
           .map { stats =>
@@ -75,7 +75,7 @@ object ModelAccuracy {
       }
       .mapAsync(1) {
         case (terminal, results) =>
-          val csvContent = (csvHeader :: results.map(_._3).toList).mkString("\n")
+          val csvContent = (csvHeader :: results.map(_._4).toList).mkString("\n")
           Utils.writeToBucket(bucketName, s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
             .map(_ => (terminal, results))
       }
@@ -111,21 +111,31 @@ object ModelAccuracy {
     }
   }
 
-  private def logStats(terminal: Terminal, results: Seq[(Int, Int, String)]): Unit = {
-    val diffs = results.map { case (predPax, actPax, _) =>
-      predPax - actPax
+  private def logStats(terminal: Terminal, results: Seq[(Int, Int, Int, String)]): Unit = {
+    val (minP: Double, maxP: Double, meanPaxP: Int, rmsePercentP: Double) = getStats(results.map { case (predPax, _, actPax, _) =>
+      (predPax, actPax)
+    })
+    val (minF: Double, maxF: Double, _: Int, rmsePercentF: Double) = getStats(results.map { case (_, fcstPax, actPax, _) =>
+      (fcstPax, actPax)
+    })
+    log.info(f"Accuracy: Terminal $terminal: Mean pax: $meanPaxP, RMSE: $rmsePercentP%.1f%% vs $rmsePercentF%.1f%%, min: $minP%.1f%% vs $minF%.1f%%, max: $maxP%.1f%% vs $maxF%.1f%%")
+  }
+
+  private def getStats(results: Seq[(Int, Int)]): (Double, Double, Int, Double) = {
+    val diffs = results.map { case (guessPax, actPax) =>
+      guessPax - actPax
     }
-    val minDiff = results.minBy { case (predPax, actPax, _) =>
-      predPax - actPax
+    val minDiff = results.minBy { case (guessPax, actPax) =>
+      guessPax - actPax
     }
-    val maxDiff = results.maxBy { case (predPax, actPax, _) =>
-      predPax - actPax
+    val maxDiff = results.maxBy { case (guessPax, actPax) =>
+      guessPax - actPax
     }
     val min = (minDiff._1 - minDiff._2).toDouble / minDiff._2 * 100
     val max = (maxDiff._1 - maxDiff._2).toDouble / maxDiff._2 * 100
     val rmse = Math.sqrt(diffs.map(d => d * d).sum / diffs.length)
     val meanPax = results.map(_._2).sum / results.length
     val rmsePercent = rmse / meanPax * 100
-    log.info(f"Terminal $terminal: Mean daily pax: $meanPax, RMSE: $rmse%.2f ($rmsePercent%.1f%%), min: $min%.1f%%, max: $max%.1f%%")
+    (min, max, meanPax, rmsePercent)
   }
 }
