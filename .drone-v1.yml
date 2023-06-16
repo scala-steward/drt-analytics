@@ -99,13 +99,7 @@ steps:
     environment:
       SLACK_WEBHOOK:
         from_secret: slack_webhook
-#    when:
-#      status:
-#        - success
-#        - failure
       event:
         - push
-#    depends_on:
-#      - Publish
 
 ...
