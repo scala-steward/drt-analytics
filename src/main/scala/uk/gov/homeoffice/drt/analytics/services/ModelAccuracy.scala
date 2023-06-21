@@ -102,7 +102,7 @@ object ModelAccuracy {
         .updatePrediction(arrival, 0, Option(100), SDate.now())
         .PassengerSources.get(MlFeedSource).flatMap(_.actual)
         .getOrElse {
-          println(s"Failed to get prediction for $arrival. Using 175")
+          log.warn(s"Failed to get prediction for $arrival. Using 175")
           175
         }
 
