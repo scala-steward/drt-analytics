@@ -1,15 +1,15 @@
 package uk.gov.homeoffice.drt.analytics
 
 import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.pattern.AskableActorRef
+import akka.actor.{ActorRef, ActorSystem}
+import akka.pattern.ask
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.FeedPersistenceIds
 import uk.gov.homeoffice.drt.analytics.passengers.DailySummaries
-import uk.gov.homeoffice.drt.analytics.time.SDate
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,7 +27,7 @@ object PaxDeltas {
 
   def maybeDeltas(dailyPaxNosByDay: Map[(Long, Long), Int],
                   numberOfDays: Int,
-                  now: () => SDate): Seq[Option[Int]] = {
+                  now: () => SDateLike): Seq[Option[Int]] = {
     val startDay = now().addDays(-1).getLocalLastMidnight
 
     (0 until numberOfDays).map { dayOffset =>
@@ -43,12 +43,12 @@ object PaxDeltas {
   }
 
   def updateDailyPassengersByOriginAndDay(terminal: String,
-                                          startDate: SDate,
+                                          startDate: SDateLike,
                                           numberOfDays: Int,
-                                          passengersActor: AskableActorRef)
+                                          passengersActor: ActorRef)
                                          (implicit timeout: Timeout,
                                           ec: ExecutionContext,
-                                          system: ActorSystem): Source[String, NotUsed] =
+                                          system: ActorSystem): Source[Option[(String, SDateLike)], NotUsed] =
     Source(0 to numberOfDays)
       .mapAsync(1) { dayOffset =>
         DailySummaries.dailyPaxCountsForDayAndTerminalByOrigin(terminal, startDate, numberOfDays, sourcesInOrder, dayOffset)
@@ -56,23 +56,21 @@ object PaxDeltas {
       .mapConcat(identity)
       .mapAsync(1) {
         case (origin, dailyPaxCountsOnDay) if dailyPaxCountsOnDay.dailyPax.isEmpty =>
-          Future(s"No daily nos available for $origin on ${dailyPaxCountsOnDay.day.toISOString}")
+          log.info(s"No daily nos available for $origin on ${dailyPaxCountsOnDay.day.toISOString}")
+          Future.successful(None)
+
         case (origin, dailyPaxCountsOnDay) =>
-          val eventualAck = passengersActor.ask(OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPaxCountsOnDay))
-            .map(_ => s"Daily pax counts persisted for $origin on ${dailyPaxCountsOnDay.day.toISOString}")
-
-          eventualAck
-            .recoverWith {
+          passengersActor.ask(OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPaxCountsOnDay))
+            .map(_ => Option((origin, dailyPaxCountsOnDay.day)))
+            .recover {
               case t =>
-                log.error("Did not receive ack", t)
-                Future("Daily pax counts might not have been persisted. Didn't receive an ack")
+                log.error(s"Did not receive ack for $origin on ${dailyPaxCountsOnDay.day.toISOString}", t)
+                None
             }
-
-          eventualAck
       }
 
   def dailyPassengersByOriginAndDayCsv(terminal: String,
-                                       startDate: SDate,
+                                       startDate: SDateLike,
                                        numberOfDays: Int)
                                       (implicit ec: ExecutionContext, system: ActorSystem): Source[String, NotUsed] = {
     val header = csvHeader(startDate, numberOfDays)
@@ -85,15 +83,15 @@ object PaxDeltas {
       }
   }
 
-  private def csvHeader(startDate: SDate, numberOfDays: Int): String =
+  private def csvHeader(startDate: SDateLike, numberOfDays: Int): String =
     "Date,Terminal,Origin," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
 
-  def startDate(numDays: Int): SDate = {
-    val today = SDate(localNow.fullYear, localNow.month, localNow.date, 0, 0)
+  def startDate(numDays: Int): SDateLike = {
+    val today = SDate(localNow.getFullYear, localNow.getMonth, localNow.getDate, 0, 0)
     today.addDays(-1 * (numDays - 1))
   }
 
-  def localNow: SDate = {
+  def localNow: SDateLike = {
     SDate.now(DateTimeZone.forID("Europe/London"))
   }
 }

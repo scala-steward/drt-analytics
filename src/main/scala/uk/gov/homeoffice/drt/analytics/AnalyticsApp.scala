@@ -12,7 +12,7 @@ import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions._
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.{noopPreProcess, populateMaxPax}
-import uk.gov.homeoffice.drt.analytics.services.{ModelAccuracy, PaxModelStats}
+import uk.gov.homeoffice.drt.analytics.services.{ModelAccuracy, PassengerCounts, PaxModelStats}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
@@ -37,9 +37,11 @@ object AnalyticsApp extends App {
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   private val portCode = PortCode(config.getString("port-code").toUpperCase)
+  private val daysToLookBack = config.getInt("days-to-look-back")
   private val daysOfTrainingData = config.getInt("options.training.days-of-data")
-  implicit val s3AsyncClient: S3AsyncClient = Utils.s3AsyncClient(config.getString("aws.access-key-id"), config.getString("aws.secret-access-key"))
   private val bucketName = config.getString("aws.s3.bucket")
+
+  implicit val s3AsyncClient: S3AsyncClient = Utils.s3AsyncClient(config.getString("aws.access-key-id"), config.getString("aws.secret-access-key"))
 
   AirportConfigs.confByPort.get(portCode) match {
     case None =>
@@ -50,6 +52,9 @@ object AnalyticsApp extends App {
     case Some(portConfig) =>
       log.info(s"Looking for job ${config.getString("options.job-name")}")
       val eventualUpdates = config.getString("options.job-name").toLowerCase match {
+        case "update-pax-counts" =>
+          PassengerCounts.updateForPort(portConfig, daysToLookBack)
+
         case "update-off-schedule-models" =>
           trainModels(OffScheduleModelDefinition, portConfig.terminals, noopPreProcess)
 
