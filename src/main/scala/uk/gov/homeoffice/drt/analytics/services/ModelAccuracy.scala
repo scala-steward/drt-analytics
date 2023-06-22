@@ -38,6 +38,7 @@ object ModelAccuracy {
               s3Client: S3AsyncClient
              ): Future[Done] = {
     val startDate = SDate.now().addDays(-days)
+    val statsStartDate = startDate.addDays((days * 0.8).toInt)
     val persistence = Flight()
 
     val csvHeader = s"Date,Terminal,Actual pax,Pred pax,Flights,Actual per flight,Predicted per flight,Actual % cap,Pred % cap,Pred diff %,Fcst pax, Fcst % cap, Fcst diff %"
@@ -57,6 +58,7 @@ object ModelAccuracy {
           (terminal, model)
       }
       .mapAsync(1) { case (terminal, model) =>
+
         Source((0 until days).toList)
           .mapAsync(1)(day => statsForDate(statsHelper, startDate, terminal, model, day))
           .collect { case (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap) if flightsCount > 0 =>
@@ -65,7 +67,8 @@ object ModelAccuracy {
             val actPaxPerFlight = actPax.toDouble / flightsCount
             val predPaxPerFlight = predPax.toDouble / flightsCount
             val csvRow = f"${date.toISOString},$terminal,$actPax,$predPax,$flightsCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actPctCap%.2f,$predPctCap%.2f,$predDiff%.2f,$fcstPax,$fcstPctCap%.2f,$fcstDiff%.2f"
-            (predPax, fcstPax, actPax, csvRow)
+            val maybeStats = if (SDate(date) >= statsStartDate) Option((predPax, fcstPax, actPax)) else None
+            (maybeStats, csvRow)
           }
           .runWith(Sink.seq)
           .map { stats =>
@@ -74,7 +77,7 @@ object ModelAccuracy {
       }
       .mapAsync(1) {
         case (terminal, results) =>
-          val csvContent = (csvHeader :: results.map(_._4).toList).mkString("\n")
+          val csvContent = (csvHeader :: results.map(_._2).toList).mkString("\n")
           Utils.writeToBucket(bucketName, s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
             .map(_ => (terminal, results))
             .recover {
@@ -138,11 +141,11 @@ object ModelAccuracy {
       }
   }
 
-  private def logStats(terminal: Terminal, results: Seq[(Int, Int, Int, String)]): Unit = {
-    val (minP: Double, maxP: Double, meanPaxP: Int, rmsePercentP: Double) = getStats(results.map { case (predPax, _, actPax, _) =>
+  private def logStats(terminal: Terminal, results: Seq[(Option[(Int, Int, Int)], String)]): Unit = {
+    val (minP: Double, maxP: Double, meanPaxP: Int, rmsePercentP: Double) = getStats(results.collect { case (Some((predPax, _, actPax)), _) =>
       (predPax, actPax)
     })
-    val (minF: Double, maxF: Double, _: Int, rmsePercentF: Double) = getStats(results.map { case (_, fcstPax, actPax, _) =>
+    val (minF: Double, maxF: Double, _: Int, rmsePercentF: Double) = getStats(results.collect { case (Some((_, fcstPax, actPax)), _) =>
       (fcstPax, actPax)
     })
     log.info(f"Accuracy: Terminal $terminal: Mean pax: $meanPaxP, RMSE: $rmsePercentP%.1f%% vs $rmsePercentF%.1f%%, min: $minP%.1f%% vs $minF%.1f%%, max: $maxP%.1f%% vs $maxF%.1f%%")
