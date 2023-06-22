@@ -59,7 +59,7 @@ class FlightRouteValuesTrainerSpec
 
     "Send a RemoveModel when there are too few training examples" in {
       val probe = TestProbe("test-probe")
-      
+
       val trainer1 = getTrainer(examples(1), probe.ref)
       trainer1.trainTerminals(List(T2))
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
