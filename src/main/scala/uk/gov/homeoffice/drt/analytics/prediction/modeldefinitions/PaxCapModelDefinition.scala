@@ -34,7 +34,7 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     Carrier,
     Origin,
     FlightNumber,
-    PrePandemicRecovery(SDate("2022-06-01T00:00:00Z")),
+    PostPandemicRecovery(SDate("2022-06-01T00:00:00Z")),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalId.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = percentCapacity(features)

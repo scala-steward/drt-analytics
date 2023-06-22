@@ -3,6 +3,7 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 import akka.persistence.{PersistentActor, Recovery, SnapshotOffer, SnapshotSelectionCriteria}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
@@ -58,23 +59,13 @@ class FlightsActor(val terminal: Terminal,
   }
 
   private def processRemovalMessage(r: UniqueArrivalMessage): Unit =
-    for {
-      scheduled <- r.scheduled
-      terminal <- r.terminalName
-      flightNumber <- r.number
-    } yield {
-      byArrivalKey = byArrivalKey - ArrivalKey(scheduled, terminal, flightNumber)
-    }
+    arrivalKeyFromMessage(r).foreach(r => byArrivalKey = byArrivalKey - r)
 
-  private def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit =
-    for {
-      flightCode <- u.getFlight.iATA
-      flightNumber <- parseFlightNumber(flightCode)
-      terminal <- u.getFlight.terminal
-      scheduled <- u.getFlight.scheduled
-    } yield {
-      byArrivalKey = byArrivalKey.updated(ArrivalKey(scheduled, terminal, flightNumber), flightWithSplitsFromMessage(u).apiFlight)
-    }
+  private def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit = {
+    val arrival = flightWithSplitsFromMessage(u).apiFlight
+    val key = ArrivalKey(arrival)
+    byArrivalKey = byArrivalKey.updated(key, arrival)
+  }
 
   override def receiveCommand: Receive = {
     case GetState =>
