@@ -7,7 +7,6 @@ import akka.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import uk.gov.homeoffice.drt.actor.PredictionModelActor
-import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.PaxModelStatsLike
 import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.populateMaxPax
 import uk.gov.homeoffice.drt.arrivals.Arrival
@@ -27,7 +26,6 @@ object ModelAccuracy {
   def analyse(days: Int,
               port: String,
               terminals: Iterable[Terminal],
-              statsHelper: PaxModelStatsLike,
               collector: Iterable[ModelAndFeatures] => Iterable[ArrivalModelAndFeatures],
               bucketName: String,
              )
@@ -60,7 +58,7 @@ object ModelAccuracy {
       .mapAsync(1) { case (terminal, model) =>
 
         Source((0 until days).toList)
-          .mapAsync(1)(day => statsForDate(statsHelper, startDate, terminal, model, day))
+          .mapAsync(1)(day => statsForDate(startDate, terminal, model, day))
           .collect { case (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap) if flightsCount > 0 =>
             val predDiff = (predPax - actPax).toDouble / actPax * 100
             val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
@@ -89,8 +87,7 @@ object ModelAccuracy {
       .runForeach { case (terminal, results) => logStats(terminal, results) }
   }
 
-  private def statsForDate(stats: PaxModelStatsLike,
-                           startDate: SDateLike,
+  private def statsForDate(startDate: SDateLike,
                            terminal: Terminal,
                            model: ArrivalModelAndFeatures,
                            day: Int,
@@ -109,11 +106,11 @@ object ModelAccuracy {
           175
         }
 
-    stats.arrivalsForDate(date, terminal, populateMaxPax, expectedFeeds = List(ApiFeedSource, LiveFeedSource))
+    PaxModelStats.arrivalsForDate(date, terminal, populateMaxPax, expectedFeeds = List(ApiFeedSource, LiveFeedSource))
       .map(_.filter(!_.Origin.isDomesticOrCta))
       .flatMap {
         arrivals =>
-          stats.arrivalsForDate(date, terminal, populateMaxPax, Option(7), List())
+          PaxModelStats.arrivalsForDate(date, terminal, populateMaxPax, Option(7), List())
             .map(_.filter(!_.Origin.isDomesticOrCta))
             .map {
               fArrivals =>
@@ -125,12 +122,12 @@ object ModelAccuracy {
                   log.error(s"Got ${liveArrivals.length} liveArrivals and ${forecastArrivals.length} fcst arrivals for $date. Skipping")
                   None
                 } else {
-                  val predPax = stats.sumPredPaxForDate(liveArrivals, predFn)
-                  val actPax = stats.sumActPaxForDate(liveArrivals)
-                  val fcstPax = stats.sumActPaxForDate(forecastArrivals)
-                  val predPctCap = stats.sumPredPctCapForDate(liveArrivals, predFn)
-                  val actPctCap = stats.sumActPctCapForDate(liveArrivals)
-                  val fcstPctCap = stats.sumActPctCapForDate(forecastArrivals)
+                  val predPax = PaxModelStats.sumPredPaxForDate(liveArrivals, predFn)
+                  val actPax = PaxModelStats.sumActPaxForDate(liveArrivals)
+                  val fcstPax = PaxModelStats.sumActPaxForDate(forecastArrivals)
+                  val predPctCap = PaxModelStats.sumPredPctCapForDate(liveArrivals, predFn)
+                  val actPctCap = PaxModelStats.sumActPctCapForDate(liveArrivals)
+                  val fcstPctCap = PaxModelStats.sumActPctCapForDate(forecastArrivals)
                   val flightsCount = liveArrivals.length
                   Option((date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap))
                 }
