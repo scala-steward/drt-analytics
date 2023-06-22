@@ -15,15 +15,15 @@ import scala.collection.mutable
 case class GetArrivals(firstDay: SDateLike, lastDay: SDateLike)
 
 object ArrivalsActor {
-  def props: (String, UtcDate) => Props = (persistenceId: String, date: UtcDate) =>
+  def props: (String, SDateLike) => Props = (persistenceId: String, date: SDateLike) =>
     Props(new ArrivalsActor(persistenceId, date))
 }
 
-class ArrivalsActor(val persistenceId: String, date: UtcDate) extends PersistentActor {
+class ArrivalsActor(val persistenceId: String, date: SDateLike) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)
 
   var arrivals: mutable.Map[UniqueArrival, SimpleArrival] = mutable.Map()
-  val pointInTime: SDateLike = SDate(date)
+  val pointInTime: SDateLike = date
 
   override def receiveRecover: Receive = {
     case SnapshotOffer(_, FlightStateSnapshotMessage(flightMessages, _)) =>

@@ -9,7 +9,7 @@ import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.FeedPersistenceIds
 import uk.gov.homeoffice.drt.analytics.passengers.DailySummaries
-import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike, UtcDate}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -43,7 +43,7 @@ object PaxDeltas {
   }
 
   def updateDailyPassengersByOriginAndDay(terminal: String,
-                                          startDate: SDateLike,
+                                          startDate: UtcDate,
                                           numberOfDays: Int,
                                           passengersActor: ActorRef)
                                          (implicit timeout: Timeout,
@@ -51,7 +51,7 @@ object PaxDeltas {
                                           system: ActorSystem): Source[Option[(String, SDateLike)], NotUsed] =
     Source(0 to numberOfDays)
       .mapAsync(1) { dayOffset =>
-        DailySummaries.dailyPaxCountsForDayAndTerminalByOrigin(terminal, startDate, numberOfDays, sourcesInOrder, dayOffset)
+        DailySummaries.dailyPaxCountsForDayAndTerminalByOrigin(terminal, startDate, numberOfDays, sourcesInOrder)
       }
       .mapConcat(identity)
       .mapAsync(1) {
@@ -69,26 +69,26 @@ object PaxDeltas {
             }
       }
 
-  def dailyPassengersByOriginAndDayCsv(terminal: String,
-                                       startDate: SDateLike,
-                                       numberOfDays: Int)
-                                      (implicit ec: ExecutionContext, system: ActorSystem): Source[String, NotUsed] = {
-    val header = csvHeader(startDate, numberOfDays)
+//  def dailyPassengersByOriginAndDayCsv(terminal: String,
+//                                       startDate: SDateLike,
+//                                       numberOfDays: Int)
+//                                      (implicit ec: ExecutionContext, system: ActorSystem): Source[String, NotUsed] = {
+//    val header = csvHeader(startDate, numberOfDays)
+//
+//    Source(0 to numberOfDays)
+//      .mapAsync(1) { dayOffset =>
+//        DailySummaries.toCsv(terminal, startDate, numberOfDays, sourcesInOrder, dayOffset).map { dataRow =>
+//          if (dayOffset == 0) header + "\n" + dataRow else dataRow
+//        }
+//      }
+//  }
 
-    Source(0 to numberOfDays)
-      .mapAsync(1) { dayOffset =>
-        DailySummaries.toCsv(terminal, startDate, numberOfDays, sourcesInOrder, dayOffset).map { dataRow =>
-          if (dayOffset == 0) header + "\n" + dataRow else dataRow
-        }
-      }
-  }
+//  private def csvHeader(startDate: SDateLike, numberOfDays: Int): String =
+//    "Date,Terminal,Origin," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
 
-  private def csvHeader(startDate: SDateLike, numberOfDays: Int): String =
-    "Date,Terminal,Origin," + (0 to numberOfDays).map { offset => startDate.addDays(offset).toISODateOnly }.mkString(",")
-
-  def startDate(numDays: Int): SDateLike = {
+  def startDate(numDays: Int): UtcDate = {
     val today = SDate(localNow.getFullYear, localNow.getMonth, localNow.getDate, 0, 0)
-    today.addDays(-1 * (numDays - 1))
+    today.addDays(-1 * (numDays - 1)).toUtcDate
   }
 
   def localNow: SDateLike = {

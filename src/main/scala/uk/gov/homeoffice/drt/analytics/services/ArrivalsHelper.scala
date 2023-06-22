@@ -25,7 +25,7 @@ object ArrivalsHelper {
       val pctWithMaxPax = (100 * arrivals.values.count(_.MaxPax.isDefined).toDouble / arrivals.size).round
       if (pctWithMaxPax < 80) {
         log.debug(s"Only $pctWithMaxPax% of arrivals have max pax for $date, populating")
-        val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, date))
+        val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, SDate(date)))
         arrivalsActor
           .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
           .map { baseArrivals =>
