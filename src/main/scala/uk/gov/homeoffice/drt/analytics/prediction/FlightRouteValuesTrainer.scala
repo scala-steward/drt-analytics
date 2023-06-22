@@ -32,6 +32,12 @@ case class FlightRouteValuesTrainer(modelName: String,
                                    ) {
   private val log = LoggerFactory.getLogger(getClass)
 
+  implicit val session: SparkSession = SparkSession
+    .builder
+    .appName("DRT Analytics")
+    .config("spark.master", "local")
+    .getOrCreate()
+
   def trainTerminals(terminals: List[Terminal])
                     (implicit ec: ExecutionContext, mat: Materializer): Future[Done] =
     Source(terminals)
@@ -59,11 +65,6 @@ case class FlightRouteValuesTrainer(modelName: String,
 
   private def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
                    (implicit mat: Materializer, executionContext: ExecutionContext): Future[Seq[Option[Double]]] = {
-    implicit val session: SparkSession = SparkSession
-      .builder
-      .appName("DRT Analytics")
-      .config("spark.master", "local")
-      .getOrCreate()
 
     val start = SDate.now().addDays(-1)
 
@@ -98,10 +99,6 @@ case class FlightRouteValuesTrainer(modelName: String,
           }
       }
       .runWith(Sink.seq)
-      .map { result =>
-        session.stop()
-        result
-      }
   }
 
   private def calculateImprovementPct(dataSet: DataSet,

@@ -104,7 +104,13 @@ object AnalyticsApp extends App {
     ).extractValuesByKey
     val persistence = Flight()
 
-    FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
+    val trainer = FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
+
+    trainer
       .trainTerminals(terminals.toList)
+      .map { d =>
+        trainer.session.stop()
+        d
+      }
   }
 }

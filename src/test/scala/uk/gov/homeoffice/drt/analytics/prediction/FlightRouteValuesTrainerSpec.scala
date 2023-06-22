@@ -59,15 +59,21 @@ class FlightRouteValuesTrainerSpec
 
     "Send a RemoveModel when there are too few training examples" in {
       val probe = TestProbe("test-probe")
-      getTrainer(examples(1), probe.ref).trainTerminals(List(T2))
+      
+      val trainer1 = getTrainer(examples(1), probe.ref)
+      trainer1.trainTerminals(List(T2))
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
+      trainer1.session.stop()
     }
 
-//    "Send a ModelUpdate when there are enough training examples" in {
-//      val probe = TestProbe("test-probe")
-//      getTrainer(examples(10), probe.ref).trainTerminals(List(T2))
-//      probe.expectMsg(60.seconds, "model update")
-//    }
+    "Send a ModelUpdate when there are enough training examples" in {
+      val probe = TestProbe("test-probe")
+
+      val trainer2 = getTrainer(examples(10), probe.ref)
+      trainer2.trainTerminals(List(T2))
+      probe.expectMsg(60.seconds, "model update")
+      trainer2.session.stop()
+    }
   }
 
   private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double])], probe: ActorRef): FlightRouteValuesTrainer = {
