@@ -11,25 +11,48 @@ import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessa
 import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsFromMessage
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
-import scala.util.Try
 
+trait FlightActorLike {
+  private val log = LoggerFactory.getLogger(getClass)
+
+  var byArrivalKey: Map[ArrivalKey, Arrival] = Map()
+  val maybePointInTime: Option[Long]
+  val date: UtcDate
+
+  def processSnapshot(ss: Any): Unit = ss match {
+    case msg: FlightsWithSplitsMessage => msg.flightWithSplits.foreach(processFlightWithSplitsMessage)
+    case unexpected => log.warn(s"Got unexpected snapshot offer message: ${unexpected.getClass}")
+  }
+
+  def processFlightWithSplitsMessage(u: FlightWithSplitsMessage): Unit = {
+    val arrival = flightWithSplitsFromMessage(u).apiFlight
+    val key = ArrivalKey(arrival)
+    byArrivalKey = byArrivalKey.updated(key, arrival)
+  }
+
+  def processDiffMsg(msg: FlightsWithSplitsDiffMessage): Unit = {
+    (maybePointInTime, msg.createdAt) match {
+      case (Some(time), Some(createdAt)) if createdAt > time =>
+      case (_, Some(createdAt)) =>
+        msg.updates.foreach(processFlightWithSplitsMessage)
+        if (SDate(createdAt) < SDate(date).addHours(28)) {
+          if (msg.removals.length < byArrivalKey.size)
+            msg.removals.foreach(processRemovalMessage)
+        }
+      case _ =>
+    }
+  }
+
+  def processRemovalMessage(r: UniqueArrivalMessage): Unit =
+    arrivalKeyFromMessage(r).foreach(r => byArrivalKey = byArrivalKey - r)
+}
 
 class FlightsActor(val terminal: Terminal,
                    val date: UtcDate,
                    val maybePointInTime: Option[Long],
-                  ) extends PersistentActor {
-  private val log = LoggerFactory.getLogger(getClass)
+                  ) extends PersistentActor with FlightActorLike {
 
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
-
-  var byArrivalKey: Map[ArrivalKey, Arrival] = Map()
-
-  private def parseFlightNumber(code: String): Option[Int] = {
-    code match {
-      case Arrival.flightCodeRegex(_, flightNumber, _) => Try(flightNumber.toInt).toOption
-      case _ => None
-    }
-  }
 
   override def recovery: Recovery = maybePointInTime match {
     case None =>
@@ -41,30 +64,10 @@ class FlightsActor(val terminal: Terminal,
 
   override def receiveRecover: Receive = {
     case SnapshotOffer(_, ss) =>
-      ss match {
-        case msg: FlightsWithSplitsMessage => msg.flightWithSplits.foreach(processFlightsWithSplitsMessage)
-        case unexpected => log.warn(s"Got unexpected snapshot offer message: ${unexpected.getClass}")
-      }
+      processSnapshot(ss)
 
-    case FlightsWithSplitsDiffMessage(Some(createdAt), removals, updates) =>
-      maybePointInTime match {
-        case Some(time) if createdAt > time =>
-        case _ =>
-          updates.foreach(processFlightsWithSplitsMessage)
-          if (SDate(createdAt) < SDate(date).addHours(28)) {
-            if (removals.length < byArrivalKey.size)
-              removals.foreach(processRemovalMessage)
-          }
-      }
-  }
-
-  private def processRemovalMessage(r: UniqueArrivalMessage): Unit =
-    arrivalKeyFromMessage(r).foreach(r => byArrivalKey = byArrivalKey - r)
-
-  private def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit = {
-    val arrival = flightWithSplitsFromMessage(u).apiFlight
-    val key = ArrivalKey(arrival)
-    byArrivalKey = byArrivalKey.updated(key, arrival)
+    case msg: FlightsWithSplitsDiffMessage =>
+      processDiffMsg(msg)
   }
 
   override def receiveCommand: Receive = {
