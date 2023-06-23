@@ -24,6 +24,7 @@ steps:
     when:
       event:
         - push
+    failure: ignore
 
   - name: sonar-scanner
     pull: if-not-exists
