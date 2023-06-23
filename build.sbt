@@ -44,6 +44,7 @@ libraryDependencies ++= Seq(
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
+  "com.typesafe" %% "ssl-config-core" % "0.6.1",
 )
 
 lazy val root = (project in file("."))
