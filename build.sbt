@@ -5,7 +5,7 @@ ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 ThisBuild / scapegoatVersion := "2.1.1"
 
-lazy val drtLib = "v532"
+lazy val drtLib = "v533"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
