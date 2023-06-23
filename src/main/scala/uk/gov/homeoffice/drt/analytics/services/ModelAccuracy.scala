@@ -56,7 +56,6 @@ object ModelAccuracy {
           (terminal, model)
       }
       .mapAsync(1) { case (terminal, model) =>
-
         Source((0 until days).toList)
           .mapAsync(1)(day => statsForDate(startDate, terminal, model, day))
           .collect { case (date, predPax, actPax, fcstPax, flightsCount, predPctCap, actPctCap, fcstPctCap) if flightsCount > 0 =>

@@ -7,7 +7,8 @@ import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion
 import uk.gov.homeoffice.drt.analytics.{Arrivals, SimpleArrival}
 import uk.gov.homeoffice.drt.arrivals.UniqueArrival
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
+import uk.gov.homeoffice.drt.ports.PortCode
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike, UtcDate}
 
 import scala.collection.mutable
@@ -27,14 +28,14 @@ class ArrivalsActor(val persistenceId: String, date: SDateLike) extends Persiste
 
   override def receiveRecover: Receive = {
     case SnapshotOffer(_, FlightStateSnapshotMessage(flightMessages, _)) =>
-      arrivals ++= flightMessages.filter(msg => SDate(msg.scheduled.get).toUtcDate == date)
-        .map(MessageConversion.fromFlightMessage)
-        .map(a => (a.uniqueArrival, a))
+      val incoming = simpleArrivalsFromMessages(flightMessages).map(a => (a.uniqueArrival, a))
+      arrivals ++= incoming
 
     case FlightsDiffMessage(Some(createdAt), removals, updates, _) =>
       if (createdAt <= pointInTime.millisSinceEpoch) {
         arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L), m.origin.getOrElse("")))
-        arrivals ++= updates.filter(msg => SDate(msg.scheduled.get).toUtcDate == date).map(MessageConversion.fromFlightMessage).map(a => (a.uniqueArrival, a))
+        val incomingUpdates = simpleArrivalsFromMessages(updates).map(a => (a.uniqueArrival, a))
+        arrivals ++= incomingUpdates
       }
 
     case _: FeedStatusMessage =>
@@ -45,6 +46,11 @@ class ArrivalsActor(val persistenceId: String, date: SDateLike) extends Persiste
     case u =>
       log.info(s"Got unexpected recovery msg: $u")
   }
+
+  private def simpleArrivalsFromMessages(updates: Seq[FlightMessage]): Seq[SimpleArrival] = updates
+    .filter(msg => SDate(msg.scheduled.get).toUtcDate == date.toUtcDate)
+    .filterNot(a => PortCode(a.origin.get).isDomesticOrCta)
+    .map(MessageConversion.fromFlightMessage)
 
   override def receiveCommand: Receive = {
     case GetArrivals(start, end) =>

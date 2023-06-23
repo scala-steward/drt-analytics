@@ -81,6 +81,7 @@ case class FlightRouteValuesTrainer(modelName: String,
           val dataFrame = prepareDataFrame(featureColumnNames, withIndex)
           removeOutliers(dataFrame) match {
             case examples if examples.count() <= 5 =>
+              log.info(s"Insufficient examples for $modelIdentifier after outlier removal")
               persistence
                 .updateModel(modelIdentifier, modelName, None)
                 .map(_ => None)
@@ -96,6 +97,11 @@ case class FlightRouteValuesTrainer(modelName: String,
               persistence
                 .updateModel(modelIdentifier, modelName, Option(modelUpdate))
                 .map(_ => Some(improvementPct))
+                .recover {
+                  case t =>
+                    log.error(s"Failed to update model for $modelIdentifier", t)
+                    None
+                }
           }
       }
       .runWith(Sink.seq)

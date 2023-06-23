@@ -2,7 +2,7 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import akka.actor.ActorRef
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
@@ -86,7 +86,7 @@ class FlightValueExtractionActor(val terminal: Terminal,
                                  val extractKey: Arrival => Option[WithId],
                                  val preProcessing: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
                                 ) extends TerminalDateActor[Arrival] with PersistentActor with FlightValueExtractionActorLike {
-
+  private val log: Logger = LoggerFactory.getLogger(getClass)
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
 
   implicit val ec: ExecutionContextExecutor = context.dispatcher
@@ -99,7 +99,9 @@ class FlightValueExtractionActor(val terminal: Terminal,
     case SnapshotOffer(_, ss) => processSnapshot(ss)
 
     case RecoveryCompleted =>
-      preProcessing(date, byArrivalKey).map(self ! PreProcessingFinished(_))
+      preProcessing(date, byArrivalKey)
+        .map(self ! PreProcessingFinished(_))
+        .recover(e => log.error(s"Failed to pre-process flights for $persistenceId", e))
 
     case msg: FlightsWithSplitsDiffMessage =>
       processFlightsWithSplitsDiffMessage(msg)
