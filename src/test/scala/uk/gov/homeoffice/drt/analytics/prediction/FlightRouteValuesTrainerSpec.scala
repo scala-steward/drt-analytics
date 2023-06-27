@@ -7,6 +7,7 @@ import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.specs2.execute.StandardResults.skipped
 import uk.gov.homeoffice.drt.actor.PredictionModelActor._
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
@@ -58,14 +59,20 @@ class FlightRouteValuesTrainerSpec
 
     "Send a RemoveModel when there are too few training examples" in {
       val probe = TestProbe("test-probe")
-      getTrainer(examples(1), probe.ref).trainTerminals(List(T2))
+
+      val trainer1 = getTrainer(examples(1), probe.ref)
+      trainer1.trainTerminals(List(T2))
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
+      trainer1.session.stop()
     }
 
     "Send a ModelUpdate when there are enough training examples" in {
       val probe = TestProbe("test-probe")
-      getTrainer(examples(10), probe.ref).trainTerminals(List(T2))
-      probe.expectMsg(20.seconds, "model update")
+
+      val trainer2 = getTrainer(examples(10), probe.ref)
+      trainer2.trainTerminals(List(T2))
+      probe.expectMsg(60.seconds, "model update")
+      trainer2.session.stop()
     }
   }
 

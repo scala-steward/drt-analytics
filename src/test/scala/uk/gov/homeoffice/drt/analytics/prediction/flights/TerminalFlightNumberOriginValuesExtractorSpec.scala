@@ -8,18 +8,19 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
 class MockFlightsActor(val terminal: Terminal,
                        val date: UtcDate,
                        val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])],
-                       val aggregateKey: Arrival => Option[TerminalFlightNumberOrigin]
+                       val aggregateKey: Arrival => Option[TerminalFlightNumberOrigin],
+                       val preProcessing: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
                       ) extends Actor with TerminalDateActor[Arrival] {
   override def receive: Receive = {
     case GetState => sender() ! MockFlightsActor.state
@@ -51,7 +52,8 @@ class TerminalFlightNumberOriginValuesExtractorSpec
     "return a source of (TerminalFlightNumberOrigin, extracted values) for a single flight on a route" in {
       val extractor = ValuesExtractor(
         classOf[MockFlightsActor],
-        (_: Arrival) => Some((0L, Seq("1", "0"), Seq())), TerminalFlightNumberOrigin.fromArrival
+        (_: Arrival) => Some((0L, Seq("1", "0"), Seq())), TerminalFlightNumberOrigin.fromArrival,
+        (_, a) => Future.successful(a)
       )
       MockFlightsActor.state = singleFlight
 
@@ -63,7 +65,8 @@ class TerminalFlightNumberOriginValuesExtractorSpec
     "return a source of (TerminalFlightNumberOrigin, extracted values) for a multiple flights on a multiple routes" in {
       val extractor = ValuesExtractor(
         classOf[MockFlightsActor],
-        (_: Arrival) => Some((0L, Seq("1", "0"), Seq())), TerminalFlightNumberOrigin.fromArrival
+        (_: Arrival) => Some((0L, Seq("1", "0"), Seq())), TerminalFlightNumberOrigin.fromArrival,
+        (_, a) => Future.successful(a)
       )
       MockFlightsActor.state = multiFlights
 

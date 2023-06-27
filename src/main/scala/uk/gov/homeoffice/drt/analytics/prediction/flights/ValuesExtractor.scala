@@ -9,7 +9,8 @@ import org.slf4j.LoggerFactory
 import scalapb.GeneratedMessage
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.time.{SDateLike, UtcDate}
 
@@ -19,6 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](actorClass: Class[T],
                                                                              extractValues: _ => Option[(Double, Seq[String], Seq[Double])],
                                                                              extractKey: M => Option[WithId],
+                                                                             preProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
                                                                             )
                                                                             (implicit system: ActorSystem,
                                                                              ec: ExecutionContext,
@@ -48,7 +50,7 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
                                    ec: ExecutionContext,
                                    timeout: Timeout
                                   ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]] = {
-    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey))
+    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
     actor
       .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]]
       .map { arrivals =>

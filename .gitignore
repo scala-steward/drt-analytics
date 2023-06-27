@@ -12,6 +12,7 @@ target
 .lib/
 dist/*
 .bsp
+*.csv
 
 # IntelliJ IDEA
 .idea

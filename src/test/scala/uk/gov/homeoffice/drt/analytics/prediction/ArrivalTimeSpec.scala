@@ -20,7 +20,14 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 
 
-class MinutesOffScheduledMock(scheduled: SDateLike) extends FlightValueExtractionActor(T2, UtcDate(2020, 10, 1), minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival) {
+class MinutesOffScheduledMock(scheduled: SDateLike)
+  extends FlightValueExtractionActor(
+    T2,
+    UtcDate(2020, 10, 1),
+    minutesOffSchedule(Seq()),
+    TerminalFlightNumberOrigin.fromArrival,
+    (_, a) => Future.successful(a)
+  ) {
   byArrivalKey = Map(
     ArrivalKey(0L, "T2", 1) -> ArrivalGenerator.arrival(terminal = T2, iata = "BA0001", origin = PortCode("LHR"), schDt = scheduled.toISOString),
   )
@@ -58,8 +65,12 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val start = scheduled.getLocalLastMidnight
             val days = 10
 
-            val arrivals = ValuesExtractor(classOf[FlightValueExtractionActor], minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival)
-              .extractValuesByKey(T2, start, days)
+            val arrivals = ValuesExtractor(
+              classOf[FlightValueExtractionActor],
+              minutesOffSchedule(Seq()),
+              TerminalFlightNumberOrigin.fromArrival,
+              (_, a) => Future.successful(a)
+            ).extractValuesByKey(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)
 

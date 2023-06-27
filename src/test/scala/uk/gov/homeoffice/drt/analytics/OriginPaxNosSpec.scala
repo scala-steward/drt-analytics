@@ -66,14 +66,14 @@ class OriginPaxNosSpec extends Specification {
   "Given a DailyPaxCountsOnDay" >> {
     val date = SDate("2020-03-19T00:00")
     val counts = Map(date.millisSinceEpoch -> 5)
-    val dailyPaxCountsOnDay = DailyPaxCountsOnDay(date.millisSinceEpoch, counts)
+    val dailyPaxCountsOnDay = DailyPaxCountsOnDay(date.toUtcDate, counts)
 
     "When I ask for the diff with an empty set of counts" >> {
       val emptyExisting = Map[(Long, Long), Int]()
       val diffs = dailyPaxCountsOnDay.diffFromExisting(emptyExisting)
 
       "Then I should get the counts from the daily pax counts" >> {
-        diffs === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => (dailyPaxCountsOnDay.dayMillis, d, c) }
+        diffs === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => (SDate(dailyPaxCountsOnDay.date).millisSinceEpoch, d, c) }
       }
     }
 
@@ -92,7 +92,7 @@ class OriginPaxNosSpec extends Specification {
       val diffs = dailyPaxCountsOnDay.diffFromExisting(existing)
 
       "Then I should get the counts from the daily pax counts" >> {
-        diffs === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => (dailyPaxCountsOnDay.dayMillis, d, c) }
+        diffs === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => (SDate(dailyPaxCountsOnDay.date).millisSinceEpoch, d, c) }
       }
     }
 
@@ -101,7 +101,7 @@ class OriginPaxNosSpec extends Specification {
       val diffs = dailyPaxCountsOnDay.diffFromExisting(existing)
 
       "Then I should get the counts from the daily pax counts" >> {
-        diffs === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => (dailyPaxCountsOnDay.dayMillis, d, c) }
+        diffs === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => (SDate(dailyPaxCountsOnDay.date).millisSinceEpoch, d, c) }
       }
     }
 
@@ -109,7 +109,7 @@ class OriginPaxNosSpec extends Specification {
       val emptyExisting = Map[(Long, Long), Int]()
       val newSet = dailyPaxCountsOnDay.applyToExisting(emptyExisting)
       "I should get a new set with the counts from the daily counts" >> {
-        newSet === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => ((dailyPaxCountsOnDay.dayMillis, d), c) }
+        newSet === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => ((SDate(dailyPaxCountsOnDay.date).millisSinceEpoch, d), c) }
       }
     }
 
@@ -126,7 +126,7 @@ class OriginPaxNosSpec extends Specification {
       val existing = Map((date.millisSinceEpoch, date.millisSinceEpoch) -> differentCount)
       val newSet = dailyPaxCountsOnDay.applyToExisting(existing)
       "I should get a new set with the updated count" >> {
-        newSet === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => ((dailyPaxCountsOnDay.dayMillis, d), c) }
+        newSet === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => ((SDate(dailyPaxCountsOnDay.date).millisSinceEpoch, d), c) }
       }
     }
 
@@ -134,7 +134,7 @@ class OriginPaxNosSpec extends Specification {
       val existing = Map((date.addDays(1).millisSinceEpoch, date.addDays(1).millisSinceEpoch) -> 5)
       val newSet = dailyPaxCountsOnDay.applyToExisting(existing)
       "I should get a new set with both sets of dates" >> {
-        newSet === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => ((dailyPaxCountsOnDay.dayMillis, d), c) } ++ existing
+        newSet === dailyPaxCountsOnDay.dailyPax.map { case (d, c) => ((SDate(dailyPaxCountsOnDay.date).millisSinceEpoch, d), c) } ++ existing
       }
     }
   }

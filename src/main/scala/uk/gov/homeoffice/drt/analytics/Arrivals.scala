@@ -11,7 +11,9 @@ case class SimpleArrival(carrierCode: String,
                          terminal: String,
                          origin: String,
                          status: String,
-                         passengerSources: Map[FeedSource, Passengers]) {
+                         passengerSources: Map[FeedSource, Passengers],
+                         maxPax: Option[Int],
+                        ) {
   def uniqueArrival: UniqueArrival = UniqueArrival(number, terminal, scheduled, origin)
 
   def isCancelled: Boolean = status match {

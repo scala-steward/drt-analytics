@@ -19,12 +19,14 @@ object MessageConversion {
     }
 
     SimpleArrival(
-      carrierCode,
-      voyageNumber,
-      fm.scheduled.getOrElse(0L),
-      fm.terminal.getOrElse(""),
-      fm.origin.getOrElse(""),
-      fm.status.getOrElse(""),
-      FlightMessageConversion.getPassengerSources(fm))
+      carrierCode = carrierCode,
+      number = voyageNumber,
+      scheduled = fm.scheduled.getOrElse(0L),
+      terminal = fm.terminal.getOrElse(""),
+      origin = fm.origin.getOrElse(""),
+      status = fm.status.getOrElse(""),
+      passengerSources = FlightMessageConversion.getPassengerSources(fm),
+      maxPax = fm.maxPax,
+    )
   }
 }

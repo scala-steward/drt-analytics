@@ -7,41 +7,50 @@ import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion
 import uk.gov.homeoffice.drt.analytics.{Arrivals, SimpleArrival}
 import uk.gov.homeoffice.drt.arrivals.UniqueArrival
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
-import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
+import uk.gov.homeoffice.drt.ports.PortCode
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FeedStatusMessage, FlightMessage, FlightStateSnapshotMessage, FlightsDiffMessage}
+import uk.gov.homeoffice.drt.time.{SDate, SDateLike, UtcDate}
 
 import scala.collection.mutable
 
 case class GetArrivals(firstDay: SDateLike, lastDay: SDateLike)
 
 object ArrivalsActor {
-  def props: (String, SDateLike) => Props = (persistenceId: String, pointInTime: SDateLike) =>
-    Props(new ArrivalsActor(persistenceId, pointInTime))
+  def props: (String, SDateLike) => Props = (persistenceId: String, date: SDateLike) =>
+    Props(new ArrivalsActor(persistenceId, date))
 }
 
-class ArrivalsActor(val persistenceId: String, pointInTime: SDateLike) extends PersistentActor {
+class ArrivalsActor(val persistenceId: String, date: SDateLike) extends PersistentActor {
   val log: Logger = LoggerFactory.getLogger(getClass)
 
   var arrivals: mutable.Map[UniqueArrival, SimpleArrival] = mutable.Map()
+  val pointInTime: SDateLike = date
 
   override def receiveRecover: Receive = {
-    case SnapshotOffer(md, FlightStateSnapshotMessage(flightMessages, _)) =>
-      println(s"Got SnapshotOffer from ${SDate(md.timestamp).toISOString}")
-      arrivals ++= flightMessages
-        .map(MessageConversion.fromFlightMessage)
-        .map(a => (a.uniqueArrival, a))
+    case SnapshotOffer(_, FlightStateSnapshotMessage(flightMessages, _)) =>
+      val incoming = simpleArrivalsFromMessages(flightMessages).map(a => (a.uniqueArrival, a))
+      arrivals ++= incoming
 
-    case FlightsDiffMessage(_, removals, updates, _) =>
-      arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L), m.origin.getOrElse("")))
-      arrivals ++= updates.map(MessageConversion.fromFlightMessage).map(a => (a.uniqueArrival, a))
+    case FlightsDiffMessage(Some(createdAt), removals, updates, _) =>
+      if (createdAt <= pointInTime.millisSinceEpoch) {
+        arrivals --= removals.map(m => UniqueArrival(m.number.getOrElse(0), m.terminalName.getOrElse(""), m.scheduled.getOrElse(0L), m.origin.getOrElse("")))
+        val incomingUpdates = simpleArrivalsFromMessages(updates).map(a => (a.uniqueArrival, a))
+        arrivals ++= incomingUpdates
+      }
 
     case _: FeedStatusMessage =>
 
     case RecoveryCompleted =>
+      log.debug(s"Recovery completed for $persistenceId at $date: ${arrivals.size} arrivals")
 
     case u =>
       log.info(s"Got unexpected recovery msg: $u")
   }
+
+  private def simpleArrivalsFromMessages(updates: Seq[FlightMessage]): Seq[SimpleArrival] = updates
+    .filter(msg => SDate(msg.scheduled.get).toUtcDate == date.toUtcDate)
+    .filterNot(a => PortCode(a.origin.get).isDomesticOrCta)
+    .map(MessageConversion.fromFlightMessage)
 
   override def receiveCommand: Receive = {
     case GetArrivals(start, end) =>
@@ -55,10 +64,7 @@ class ArrivalsActor(val persistenceId: String, pointInTime: SDateLike) extends P
 
   override def recovery: Recovery = {
     val criteria = SnapshotSelectionCriteria(maxTimestamp = pointInTime.millisSinceEpoch)
-    val recovery = Recovery(fromSnapshot = criteria, replayMax = 500)
-
-    log.info(s"Recovery: $recovery $persistenceId ${pointInTime.toISOString}")
-    recovery
+    Recovery(fromSnapshot = criteria, replayMax = 500)
   }
 }
 

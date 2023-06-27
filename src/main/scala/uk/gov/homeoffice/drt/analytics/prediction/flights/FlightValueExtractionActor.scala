@@ -1,84 +1,126 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
+import akka.actor.ActorRef
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
+import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightValueExtractionActor.{PreProcessingFinished, noCtaOrDomestic}
 import uk.gov.homeoffice.drt.arrivals.Arrival
+import uk.gov.homeoffice.drt.ports.PortCode
+import uk.gov.homeoffice.drt.ports.Ports.isDomesticOrCta
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
 import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsFromMessage
 import uk.gov.homeoffice.drt.time.UtcDate
 
-import scala.util.Try
+import scala.collection.immutable
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 
-class FlightValueExtractionActor(val terminal: Terminal,
-                                 val date: UtcDate,
-                                 val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])],
-                                 val extractKey: Arrival => Option[WithId],
-                                ) extends TerminalDateActor[Arrival] with PersistentActor {
-  private val log = LoggerFactory.getLogger(getClass)
+object FlightValueExtractionActor {
+  case class PreProcessingFinished(byArrivalKey: Map[ArrivalKey, Arrival])
 
-  override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
+  val noCtaOrDomestic: FlightWithSplitsMessage => Boolean = msg => !isDomesticOrCta(PortCode(msg.getFlight.origin.get))
+}
 
-  var byArrivalKey: Map[ArrivalKey, Arrival] = Map()
-  var valuesWithFeaturesByExtractedKey: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]] = Map()
-
-  private def parseFlightNumber(code: String): Option[Int] = {
-    code match {
-      case Arrival.flightCodeRegex(_, flightNumber, _) => Try(flightNumber.toInt).toOption
-      case _ => None
-    }
-  }
-
-  override def receiveRecover: Receive = {
-    case SnapshotOffer(_, ss) =>
-      ss match {
-        case msg: FlightsWithSplitsMessage => msg.flightWithSplits.foreach(processFlightsWithSplitsMessage)
-        case unexpected => log.warn(s"Got unexpected snapshot offer message: ${unexpected.getClass}")
-      }
-
-    case RecoveryCompleted =>
-      valuesWithFeaturesByExtractedKey = byArrivalKey
-        .groupBy {
-          case (_, msg) => extractKey(msg)
-        }
-        .collect {
-          case (Some(key), flightMessages) =>
-            val examples = flightMessages
-              .map { case (_, msg) => extractValues(msg) }
-              .collect { case Some(value) => value }
-            (key, examples)
-        }
-
-    case FlightsWithSplitsDiffMessage(_, removals, updates) =>
-      updates.foreach(processFlightsWithSplitsMessage)
-      removals.foreach(processRemovalMessage)
-  }
-
-  private def processRemovalMessage(r: UniqueArrivalMessage): Unit =
+object FlightMessageConversions {
+  def arrivalKeyFromMessage(r: UniqueArrivalMessage): Option[ArrivalKey] =
     for {
       scheduled <- r.scheduled
       terminal <- r.terminalName
       flightNumber <- r.number
     } yield {
-      byArrivalKey = byArrivalKey - ArrivalKey(scheduled, terminal, flightNumber)
+      ArrivalKey(scheduled, terminal, flightNumber)
     }
 
-  private def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit =
-    for {
-      flightCode <- u.getFlight.iATA
-      flightNumber <- parseFlightNumber(flightCode)
-      terminal <- u.getFlight.terminal
-      scheduled <- u.getFlight.scheduled
-    } yield {
-      byArrivalKey = byArrivalKey.updated(ArrivalKey(scheduled, terminal, flightNumber), flightWithSplitsFromMessage(u).apiFlight)
-    }
+}
+
+trait FlightValueExtractionActorLike {
+  private val log = LoggerFactory.getLogger(getClass)
+
+  var byArrivalKey: Map[ArrivalKey, Arrival] = Map()
+
+  val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])]
+  val extractKey: Arrival => Option[WithId]
+
+  def processSnapshot(ss: Any): Unit = ss match {
+    case msg: FlightsWithSplitsMessage => msg.flightWithSplits.filter(noCtaOrDomestic).foreach(processFlightsWithSplitsMessage)
+    case unexpected => log.warn(s"Got unexpected snapshot offer message: ${unexpected.getClass}")
+  }
+
+  def processFlightsWithSplitsMessage(u: FlightWithSplitsMessage): Unit = {
+    val arrival = flightWithSplitsFromMessage(u).apiFlight
+    val key = ArrivalKey(arrival)
+    byArrivalKey = byArrivalKey.updated(key, arrival)
+  }
+
+  def processRemovalMessage(r: UniqueArrivalMessage): Unit =
+    arrivalKeyFromMessage(r).foreach(r => byArrivalKey = byArrivalKey - r)
+
+  def processFlightsWithSplitsDiffMessage(msg: FlightsWithSplitsDiffMessage): Unit = {
+    msg.updates.filter(noCtaOrDomestic).foreach(processFlightsWithSplitsMessage)
+    msg.removals.foreach(processRemovalMessage)
+  }
+
+  def extractions(byArrivalKeyProcessed: Map[ArrivalKey, Arrival]): Map[WithId, immutable.Iterable[(Double, Seq[String], Seq[Double])]] =
+    byArrivalKeyProcessed
+      .groupBy {
+        case (_, msg) => extractKey(msg)
+      }
+      .collect {
+        case (Some(key), flightMessages) =>
+          val examples = flightMessages
+            .map { case (_, msg) => extractValues(msg) }
+            .collect { case Some(value) => value }
+          (key, examples)
+      }
+}
+
+class FlightValueExtractionActor(val terminal: Terminal,
+                                 val date: UtcDate,
+                                 val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])],
+                                 val extractKey: Arrival => Option[WithId],
+                                 val preProcessing: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
+                                ) extends TerminalDateActor[Arrival] with PersistentActor with FlightValueExtractionActorLike {
+  private val log: Logger = LoggerFactory.getLogger(getClass)
+  override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
+
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
+
+  var valuesWithFeaturesByExtractedKey: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]] = Map()
+  var preProcessingFinished = false
+  var stateRequests: List[ActorRef] = List()
+
+  override def receiveRecover: Receive = {
+    case SnapshotOffer(_, ss) => processSnapshot(ss)
+
+    case RecoveryCompleted =>
+      preProcessing(date, byArrivalKey)
+        .map(self ! PreProcessingFinished(_))
+        .recover(e => log.error(s"Failed to pre-process flights for $persistenceId", e))
+
+    case msg: FlightsWithSplitsDiffMessage =>
+      processFlightsWithSplitsDiffMessage(msg)
+  }
 
   override def receiveCommand: Receive = {
-    case GetState => sender() ! valuesWithFeaturesByExtractedKey
+    case PreProcessingFinished(byArrivalKeyProcessed) =>
+      valuesWithFeaturesByExtractedKey = extractions(byArrivalKeyProcessed)
+      if (stateRequests.nonEmpty) {
+        stateRequests.foreach(_ ! valuesWithFeaturesByExtractedKey)
+        stateRequests = List()
+      }
+      preProcessingFinished = true
+
+    case GetState =>
+      if (preProcessingFinished) {
+        sender() ! valuesWithFeaturesByExtractedKey
+      } else {
+        stateRequests = sender() :: stateRequests
+      }
   }
 }

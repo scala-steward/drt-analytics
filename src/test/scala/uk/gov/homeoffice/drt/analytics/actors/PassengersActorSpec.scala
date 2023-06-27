@@ -47,7 +47,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
   val terminal = "T1"
   val date20200301: SDateLike = SDate("2020-03-01")
 
-  val dailyPax: DailyPaxCountsOnDay = DailyPaxCountsOnDay(date20200301.millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
+  val dailyPax: DailyPaxCountsOnDay = DailyPaxCountsOnDay(date20200301.toUtcDate, Map(date20200301.millisSinceEpoch -> 100))
   val otDailyPax: OriginTerminalDailyPaxCountsOnDay = OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPax)
 
   "Given a PassengersActor" >> {
@@ -66,7 +66,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
     "When I send it a counts for an origin and terminal, for 2 points in time separately, and then ask for the counts" >> {
       "Then I should get back the combined counts I sent it" >> {
         val actor = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
-        val dailyPax2 = DailyPaxCountsOnDay(date20200301.addDays(1).millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
+        val dailyPax2 = DailyPaxCountsOnDay(date20200301.addDays(1).toUtcDate, Map(date20200301.millisSinceEpoch -> 100))
         val otDailyPax2 = OriginTerminalDailyPaxCountsOnDay(origin, terminal, dailyPax2)
         val eventualCounts = actor.ask(otDailyPax).flatMap { _ =>
           actor.ask(otDailyPax2).flatMap { _ =>
@@ -84,7 +84,7 @@ class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with 
     "When I send it a counts for one origin and terminal, followed by a different origin & terminal, and then ask for the counts for the first" >> {
       "Then I should get back the counts I sent for the first origin and terminal" >> {
         val actor = system.actorOf(Props(new PassengersActor(() => date20200301, 30)))
-        val dailyPax2 = DailyPaxCountsOnDay(date20200301.addDays(1).millisSinceEpoch, Map(date20200301.millisSinceEpoch -> 100))
+        val dailyPax2 = DailyPaxCountsOnDay(date20200301.addDays(1).toUtcDate, Map(date20200301.millisSinceEpoch -> 100))
         val origin2 = "BHX"
         val otDailyPax2 = OriginTerminalDailyPaxCountsOnDay(origin2, terminal, dailyPax2)
         val eventualCounts = actor.ask(otDailyPax).flatMap { _ =>

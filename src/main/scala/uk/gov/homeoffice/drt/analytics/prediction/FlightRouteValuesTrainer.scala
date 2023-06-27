@@ -32,6 +32,12 @@ case class FlightRouteValuesTrainer(modelName: String,
                                    ) {
   private val log = LoggerFactory.getLogger(getClass)
 
+  implicit val session: SparkSession = SparkSession
+    .builder
+    .appName("DRT Analytics")
+    .config("spark.master", "local")
+    .getOrCreate()
+
   def trainTerminals(terminals: List[Terminal])
                     (implicit ec: ExecutionContext, mat: Materializer): Future[Done] =
     Source(terminals)
@@ -58,12 +64,7 @@ case class FlightRouteValuesTrainer(modelName: String,
   }
 
   private def train(daysOfData: Int, validationSetPct: Int, terminal: Terminals.Terminal)
-                   (implicit mat: Materializer): Future[Seq[Option[Double]]] = {
-    implicit val session: SparkSession = SparkSession
-      .builder
-      .appName("DRT Analytics")
-      .config("spark.master", "local")
-      .getOrCreate()
+                   (implicit mat: Materializer, executionContext: ExecutionContext): Future[Seq[Option[Double]]] = {
 
     val start = SDate.now().addDays(-1)
 
@@ -74,14 +75,17 @@ case class FlightRouteValuesTrainer(modelName: String,
     log.info(s"Training $modelName for $terminal with $daysOfData days of data, $trainingSetPct% training, $validationSetPct% validation")
 
     examplesProvider(terminal, start, daysOfData)
-      .map {
+      .mapAsync(1) {
         case (modelIdentifier, allExamples) =>
           val withIndex = allExamples.zipWithIndex
           val dataFrame = prepareDataFrame(featureColumnNames, withIndex)
           removeOutliers(dataFrame) match {
             case examples if examples.count() <= 5 =>
-              persistence.updateModel(modelIdentifier, modelName, None)
-              None
+              log.info(s"Insufficient examples for $modelIdentifier after outlier removal")
+              persistence
+                .updateModel(modelIdentifier, modelName, None)
+                .map(_ => None)
+
             case withoutOutliers =>
               log.info(s"Training $modelName for $modelIdentifier with ${withoutOutliers.count()} out of ${allExamples.size} examples after outlier removal")
               val trainingExamples = (allExamples.size.toDouble * (trainingSetPct.toDouble / 100)).toInt
@@ -90,8 +94,14 @@ case class FlightRouteValuesTrainer(modelName: String,
               val improvementPct = calculateImprovementPct(dataSet, withIndex, lrModel, validationSetPct, baselineValue(terminal))
               val regressionModel = RegressionModelFromSpark(lrModel)
               val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
-              persistence.updateModel(modelIdentifier, modelName, Option(modelUpdate))
-              Some(improvementPct)
+              persistence
+                .updateModel(modelIdentifier, modelName, Option(modelUpdate))
+                .map(_ => Some(improvementPct))
+                .recover {
+                  case t =>
+                    log.error(s"Failed to update model for $modelIdentifier", t)
+                    None
+                }
           }
       }
       .runWith(Sink.seq)
