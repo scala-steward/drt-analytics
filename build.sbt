@@ -5,7 +5,7 @@ ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 ThisBuild / scapegoatVersion := "2.1.1"
 
-lazy val drtLib = "v533"
+lazy val drtLib = "v537"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
@@ -20,6 +20,7 @@ lazy val sparkVersion = "3.4.0"
 lazy val scalaTestVersion = "3.2.15"
 lazy val catsVersion = "2.9.0"
 lazy val awsJava2SdkVersion = "2.13.73"
+lazy val sslConfigCore = "0.6.1"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -44,7 +45,7 @@ libraryDependencies ++= Seq(
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
-  "com.typesafe" %% "ssl-config-core" % "0.6.1",
+  "com.typesafe" %% "ssl-config-core" % sslConfigCore,
 )
 
 lazy val root = (project in file("."))

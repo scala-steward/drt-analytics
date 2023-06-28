@@ -18,6 +18,7 @@ class FeatureVectorsSpec extends AnyWordSpec with Matchers with BeforeAndAfterAl
 
   override def afterAll(): Unit = session.close()
 
+
   "Given a Row from a DataFrame and a FeaturesWithOneToManyValues, FeatureVectors" should {
     val colNames = Seq("label", "bestPax", "carrier", "origin", "bestPax", "index")
     val row = List((1d, 5d, "1d", "2d", 3d, "1")).toDF(colNames: _*).collect().head

@@ -4,7 +4,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{BestPax, Carrier}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Carrier
 
 object MockData {
   val colNames: Seq[String] = Seq("target", "carrier", "origin", "index")
@@ -32,7 +32,7 @@ class DataSetTest extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   val df: DataFrame = MockData.data
 
   "A small DataSet" should {
-    val dataSet = DataSet(df, List(BestPax, Carrier))
+    val dataSet = DataSet(df, List(Carrier))
 
     "Provide an indexed version with an incrementing number" in {
       dataSet.dfIndexed.select("_index").collect().map(_(0)) === Array(0, 1, 2, 3)

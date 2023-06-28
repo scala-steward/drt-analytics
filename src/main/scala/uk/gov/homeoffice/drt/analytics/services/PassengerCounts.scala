@@ -27,6 +27,7 @@ object PassengerCounts {
       .filter(_.isDefined)
       .map {
         case Some((origin, date)) => log.debug(s"Daily pax counts persisted for $origin on ${date.toISOString}")
+        case _ =>
       }
       .runWith(Sink.ignore)
   }
