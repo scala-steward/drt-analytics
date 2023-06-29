@@ -16,7 +16,7 @@ lazy val jodaTimeVersion = "2.12.2"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.15.2"
 lazy val specs2Version = "4.19.2"
-lazy val sparkVersion = "3.4.0"
+lazy val sparkVersion = "3.4.1"
 lazy val scalaTestVersion = "3.2.15"
 lazy val catsVersion = "2.9.0"
 lazy val awsJava2SdkVersion = "2.13.73"
@@ -27,6 +27,7 @@ libraryDependencies ++= Seq(
   "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
   "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
   "org.apache.spark" %% "spark-mllib" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
