@@ -5,27 +5,29 @@ ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 ThisBuild / scapegoatVersion := "2.1.2"
 
-lazy val drtLib = "v533"
+lazy val drtLib = "v537"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
 lazy val akkaPersistenceJdbcVersion = "5.2.0"
 lazy val akkaPersistenceInMemoryVersion = "2.5.15.2"
 lazy val postgresVersion = "42.5.4"
-lazy val jodaTimeVersion = "2.12.2"
+lazy val jodaTimeVersion = "2.12.5"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.15.2"
-lazy val specs2Version = "4.19.2"
-lazy val sparkVersion = "3.4.0"
-lazy val scalaTestVersion = "3.2.15"
+lazy val specs2Version = "4.20.0"
+lazy val sparkVersion = "3.4.1"
+lazy val scalaTestVersion = "3.2.16"
 lazy val catsVersion = "2.9.0"
 lazy val awsJava2SdkVersion = "2.13.73"
+lazy val sslConfigCore = "0.6.1"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
   "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
   "org.apache.spark" %% "spark-mllib" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
@@ -44,7 +46,7 @@ libraryDependencies ++= Seq(
   "uk.gov.homeoffice" %% "drt-lib" % drtLib excludeAll("org.scala-lang.modules", "scala-xml"),
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
-  "com.typesafe" %% "ssl-config-core" % "0.6.1",
+  "com.typesafe" %% "ssl-config-core" % sslConfigCore,
 )
 
 lazy val root = (project in file("."))

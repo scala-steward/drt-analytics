@@ -4,7 +4,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{BestPax, Carrier, Feature}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Carrier, DayOfWeek, Feature}
+import uk.gov.homeoffice.drt.time.SDate
 
 class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession
@@ -27,7 +28,7 @@ class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll
         (0d, 4d, "4"),
       ).toDF(colNames: _*)
 
-      val featureSpecs = List(BestPax)
+      val featureSpecs = List(DayOfWeek()(ts => SDate(ts)))
 
       trainAndPredict(data, featureSpecs).values.map(_.round) should ===(Array(3d, 4d))
     }
@@ -42,7 +43,7 @@ class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll
         (4d, 2d, "4d", "4"),
       ).toDF(colNames: _*)
 
-      val featureSpecs = List(Carrier, BestPax)
+      val featureSpecs = List(Carrier)
 
       DataSet(data, featureSpecs).trainModel("target", 100).coefficients.size should ===(5)
     }

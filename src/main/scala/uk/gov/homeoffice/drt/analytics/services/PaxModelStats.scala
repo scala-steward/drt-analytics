@@ -7,6 +7,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightsActor
 import uk.gov.homeoffice.drt.arrivals.{Arrival, Passengers}
+import uk.gov.homeoffice.drt.ports.{ApiFeedSource, LiveFeedSource}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalModelAndFeatures
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
@@ -16,8 +17,11 @@ import scala.concurrent.{ExecutionContext, Future}
 object PaxModelStats {
   protected val log: Logger = LoggerFactory.getLogger(getClass)
 
-  def sumActPaxForDate(arrivals: Seq[Arrival]): Int =
-    arrivals.map(_.bestPcpPaxEstimate.getOrElse(0)).sum
+  private val paxSourceOrderPreference = List(LiveFeedSource, ApiFeedSource)
+
+  def sumActPaxForDate(arrivals: Seq[Arrival]): Int = {
+    arrivals.map(_.bestPcpPaxEstimate(paxSourceOrderPreference).getOrElse(0)).sum
+  }
 
   def sumPredPaxForDate(arrivals: Seq[Arrival], predPax: Arrival => Int): Int =
     arrivals.map(predPax).sum
@@ -34,7 +38,7 @@ object PaxModelStats {
 
   def sumActPctCapForDate(arrivals: Seq[Arrival]): Double = {
     val total = arrivals.map { a =>
-      (a.bestPcpPaxEstimate, a.MaxPax) match {
+      (a.bestPcpPaxEstimate(paxSourceOrderPreference), a.MaxPax) match {
         case (Some(actPax), Some(maxPax)) if maxPax > 0 => 100d * actPax / maxPax
         case _ => 80
       }
