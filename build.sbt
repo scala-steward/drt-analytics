@@ -5,7 +5,7 @@ ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 ThisBuild / scapegoatVersion := "2.1.2"
 
-lazy val drtLib = "v537"
+lazy val drtLib = "v548"
 
 lazy val akkaHttpVersion = "10.4.0"
 lazy val akkaVersion = "2.7.0"
@@ -21,6 +21,7 @@ lazy val scalaTestVersion = "3.2.16"
 lazy val catsVersion = "2.9.0"
 lazy val awsJava2SdkVersion = "2.13.73"
 lazy val sslConfigCore = "0.6.1"
+lazy val scalaXmlVersion = "2.1.0"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -32,6 +33,7 @@ libraryDependencies ++= Seq(
 
   "org.apache.spark" %% "spark-mllib" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
   "org.apache.spark" %% "spark-sql" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
+  "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
   "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",
