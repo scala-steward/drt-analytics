@@ -3,12 +3,13 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
-import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, ArrivalGenerator, Passengers}
+import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, ArrivalGenerator, EventTypes, Passengers, SplitStyle, Splits, SplitsForArrivals}
+import uk.gov.homeoffice.drt.ports.SplitRatiosNs.SplitSources
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
-import uk.gov.homeoffice.drt.ports.UnknownFeedSource
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
-import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsToMessage
+import uk.gov.homeoffice.drt.ports.{ApiFeedSource, ApiPaxTypeAndQueueCount, PaxTypes, Queues, UnknownFeedSource}
+import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage, PaxTypeAndQueueCountMessage, SplitMessage, SplitsForArrivalMessage, SplitsForArrivalsMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FlightsDiffMessage, UniqueArrivalMessage}
+import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.{flightMessageToApiFlight, flightWithSplitsToMessage, splitsForArrivalsToMessage, uniqueArrivalToMessage}
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 class FlightActorLikeSpec extends AnyWordSpec with Matchers {
@@ -49,17 +50,17 @@ class FlightActorLikeSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  "processFlightsWithSplitsDiffMessage" should {
+  "processUpdatesAndRemovals" should {
     val actorLike = newMock(None, UtcDate(2023, 6, 22))
     "add and remove flights contained in a FlightsWithSplitsMessage" in {
       actorLike.byArrivalKey = Map(ArrivalKey(arrival1) -> arrival1)
       val removeArrival1AddArrival2 = FlightsWithSplitsDiffMessage(Option(1L), Seq(uniqueArrivalMessage(arrival1)), scala.Seq(flightWithSplitsMessage2))
-      actorLike.processDiffMsg(removeArrival1AddArrival2)
+      actorLike.processUpdatesAndRemovals(removeArrival1AddArrival2.createdAt.get, removeArrival1AddArrival2.updates, removeArrival1AddArrival2.removals, actorLike.deserialiseFwsMsg)
       actorLike.byArrivalKey should ===(Map(ArrivalKey(arrival2) -> arrival2))
     }
   }
 
-  "processFlightsWithSplitsDiffMessage with a recovery point in time set" should {
+  "processUpdatesAndRemovals with a recovery point in time set" should {
     val pit = SDate("2023-06-22T12:00")
     val actorLike = newMock(Option(pit.millisSinceEpoch), UtcDate(2023, 6, 22))
     "ignore a FlightsWithSplitsMessage created after the recovery point in time" in {
@@ -69,8 +70,51 @@ class FlightActorLikeSpec extends AnyWordSpec with Matchers {
         createdAtLaterThanRecovery,
         Seq(uniqueArrivalMessage(arrival1)),
         scala.Seq(flightWithSplitsMessage2))
-      actorLike.processDiffMsg(removeArrival1AddArrival2)
+      actorLike.processUpdatesAndRemovals(removeArrival1AddArrival2.createdAt.get, removeArrival1AddArrival2.updates, removeArrival1AddArrival2.removals, actorLike.deserialiseFwsMsg)
       actorLike.byArrivalKey should ===(Map(ArrivalKey(arrival1) -> arrival1))
+    }
+  }
+
+  "processUpdatesAndRemovals" should {
+    val actorLike = newMock(None, UtcDate(2023, 6, 22))
+    "add and remove flights contained in a FlightsDiffMessage" in {
+      actorLike.byArrivalKey = Map(ArrivalKey(arrival1) -> arrival1)
+      val removeArrival1AddArrival2 = FlightsDiffMessage(Option(1L), Seq(uniqueArrivalMessage(arrival1)), scala.Seq(flightWithSplitsMessage2.getFlight))
+      actorLike.processUpdatesAndRemovals(removeArrival1AddArrival2.createdAt.get, removeArrival1AddArrival2.updates, removeArrival1AddArrival2.removals, flightMessageToApiFlight)
+      actorLike.byArrivalKey should ===(Map(ArrivalKey(arrival2) -> arrival2))
+    }
+  }
+
+  "processUpdatesAndRemovals with a recovery point in time set" should {
+    val pit = SDate("2023-06-22T12:00")
+    val actorLike = newMock(Option(pit.millisSinceEpoch), UtcDate(2023, 6, 22))
+    "ignore a FlightsDiffMessage created after the recovery point in time" in {
+      actorLike.byArrivalKey = Map(ArrivalKey(arrival1) -> arrival1)
+      val createdAtLaterThanRecovery = Option(pit.addMinutes(1).millisSinceEpoch)
+      val removeArrival1AddArrival2 = FlightsDiffMessage(
+        createdAtLaterThanRecovery,
+        Seq(uniqueArrivalMessage(arrival1)),
+        scala.Seq(flightWithSplitsMessage2.getFlight))
+      actorLike.processUpdatesAndRemovals(removeArrival1AddArrival2.createdAt.get, removeArrival1AddArrival2.updates, removeArrival1AddArrival2.removals, flightMessageToApiFlight)
+      actorLike.byArrivalKey should ===(Map(ArrivalKey(arrival1) -> arrival1))
+    }
+  }
+
+  "processSplitsDiff" should {
+    val actorLike = newMock(None, UtcDate(2023, 6, 22))
+    "Update arrival pax nos from API splits" in {
+      actorLike.byArrivalKey = Map(ArrivalKey(arrival1) -> arrival1)
+      val apiSplits = SplitsForArrivals(Map(arrival1.unique -> Set(Splits(
+        Set(ApiPaxTypeAndQueueCount(PaxTypes.GBRNational, Queues.EeaDesk, 50d, None, None)),
+        SplitSources.ApiSplitsWithHistoricalEGateAndFTPercentages,
+        Option(EventTypes.DC),
+        SplitStyle.PaxNumbers
+      ))))
+      actorLike.processSplitsDiff(splitsForArrivalsToMessage(apiSplits, 1L))
+      actorLike.byArrivalKey should ===(Map(ArrivalKey(arrival1) -> arrival1.copy(
+        FeedSources = arrival1.FeedSources + ApiFeedSource,
+        PassengerSources = arrival1.PassengerSources + (ApiFeedSource -> Passengers(Option(50), Option(0))),
+      )))
     }
   }
 

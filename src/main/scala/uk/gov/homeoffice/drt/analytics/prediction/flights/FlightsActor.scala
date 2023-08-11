@@ -4,11 +4,11 @@ import akka.persistence.{PersistentActor, Recovery, SnapshotOffer, SnapshotSelec
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
-import uk.gov.homeoffice.drt.arrivals.Arrival
+import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, FlightsWithSplits}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
-import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
-import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsFromMessage
+import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage, SplitsForArrivalsMessage}
+import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FlightsDiffMessage, UniqueArrivalMessage}
+import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.{flightMessageToApiFlight, flightWithSplitsFromMessage, splitsForArrivalsFromMessage}
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 
@@ -30,16 +30,39 @@ trait FlightActorLike {
     byArrivalKey = byArrivalKey.updated(key, arrival)
   }
 
-  def processDiffMsg(msg: FlightsWithSplitsDiffMessage): Unit = {
-    (maybePointInTime, msg.createdAt) match {
-      case (Some(time), Some(createdAt)) if createdAt > time =>
-      case (_, Some(createdAt)) =>
-        msg.updates.foreach(processFlightWithSplitsMessage)
+  def deserialiseFwsMsg(u: FlightWithSplitsMessage): Arrival =
+    flightWithSplitsFromMessage(u).apiFlight
+
+  def processUpdatesAndRemovals[A](createdAt: Long,
+                                   updates: Iterable[A],
+                                   removals: Iterable[UniqueArrivalMessage],
+                                   deserialiseUpdate: A => Arrival,
+                                  ): Unit = {
+    (maybePointInTime, createdAt) match {
+      case (Some(time), createdAt) if createdAt > time =>
+      case (_, createdAt) =>
+        updates
+          .map(deserialiseUpdate)
+          .foreach(arrival => byArrivalKey = byArrivalKey.updated(ArrivalKey(arrival), arrival))
+
         if (SDate(createdAt) < SDate(date).addHours(28)) {
-          if (msg.removals.length < byArrivalKey.size)
-            msg.removals.foreach(processRemovalMessage)
+          if (removals.size < byArrivalKey.size)
+            removals.foreach(processRemovalMessage)
         }
       case _ =>
+    }
+  }
+
+  def processSplitsDiff(msg: SplitsForArrivalsMessage): Unit = {
+    (maybePointInTime, msg.createdAt) match {
+      case (Some(time), Some(createdAt)) if createdAt > time =>
+      case _ =>
+        val nowMillis = SDate.now().millisSinceEpoch
+        val flightsWithSplits = FlightsWithSplits(byArrivalKey.values.map(a => ApiFlightWithSplits(a, Set(), None)))
+        splitsForArrivalsFromMessage(msg).applyTo(flightsWithSplits, nowMillis, List()) match {
+          case (FlightsWithSplits(flights), _) =>
+            flights.values.foreach(f => byArrivalKey = byArrivalKey.updated(ArrivalKey(f.apiFlight), f.apiFlight))
+        }
     }
   }
 
@@ -66,8 +89,14 @@ class FlightsActor(val terminal: Terminal,
     case SnapshotOffer(_, ss) =>
       processSnapshot(ss)
 
-    case msg: FlightsWithSplitsDiffMessage =>
-      processDiffMsg(msg)
+    case FlightsWithSplitsDiffMessage(Some(createdAt), removals, updates) =>
+      processUpdatesAndRemovals(createdAt, updates, removals, deserialiseFwsMsg)
+
+    case FlightsDiffMessage(Some(createdAt), removals, updates, _) =>
+      processUpdatesAndRemovals(createdAt, updates, removals, flightMessageToApiFlight)
+
+    case msg: SplitsForArrivalsMessage =>
+      processSplitsDiff(msg)
   }
 
   override def receiveCommand: Receive = {
