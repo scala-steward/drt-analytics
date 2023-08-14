@@ -75,9 +75,7 @@ object AnalyticsApp extends App {
           trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals, noopPreProcess)
 
         case "update-pax-cap-models" =>
-          trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax()).flatMap { _ =>
-            ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName)
-          }
+          trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax())
 
         case "dump-daily-pax-cap" =>
           ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName)
