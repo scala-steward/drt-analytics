@@ -48,8 +48,8 @@ class ArrivalsActor(val persistenceId: String, date: SDateLike) extends Persiste
   }
 
   private def simpleArrivalsFromMessages(updates: Seq[FlightMessage]): Seq[SimpleArrival] = updates
-    .filter(msg => SDate(msg.scheduled.get).toUtcDate == date.toUtcDate)
-    .filterNot(a => PortCode(a.origin.get).isDomesticOrCta)
+    .filter(msg => SDate(msg.getScheduled).toUtcDate == date.toUtcDate)
+    .filterNot(a => PortCode(a.getOrigin).isDomesticOrCta)
     .map(MessageConversion.fromFlightMessage)
 
   override def receiveCommand: Receive = {

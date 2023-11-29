@@ -48,12 +48,10 @@ object ModelAccuracy {
       }
       .map { case (terminal, models) =>
         val modelsAndFeatures = collector(models.models.values)
-        (terminal, modelsAndFeatures)
+        (terminal, modelsAndFeatures.headOption)
       }
       .collect {
-        case (terminal, models) =>
-          val model = models.head
-          (terminal, model)
+        case (terminal, Some(model)) => (terminal, model)
       }
       .mapAsync(1) { case (terminal, model) =>
         Source((0 until days).toList)
