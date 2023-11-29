@@ -1,14 +1,14 @@
 
-ThisBuild / scalaVersion := "2.13.11"
+ThisBuild / scalaVersion := "2.13.12"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
-ThisBuild / scapegoatVersion := "2.1.2"
+//ThisBuild / scapegoatVersion := "2.1.2"
 
-lazy val drtLib = "v593"
+lazy val drtLib = "v20231129_1"
 
-lazy val akkaHttpVersion = "10.4.0"
-lazy val akkaVersion = "2.7.0"
+lazy val akkaHttpVersion = "10.5.3"
+lazy val akkaVersion = "2.8.5"
 lazy val akkaPersistenceJdbcVersion = "5.2.0"
 lazy val akkaPersistenceInMemoryVersion = "2.5.15.2"
 lazy val postgresVersion = "42.5.4"

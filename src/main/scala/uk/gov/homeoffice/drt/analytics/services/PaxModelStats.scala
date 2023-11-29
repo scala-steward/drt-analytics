@@ -4,11 +4,12 @@ import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.pattern.ask
 import akka.util.Timeout
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
+import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightsActor
 import uk.gov.homeoffice.drt.arrivals.{Arrival, Passengers}
-import uk.gov.homeoffice.drt.ports.{ApiFeedSource, LiveFeedSource}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.ports.{ApiFeedSource, LiveFeedSource}
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalModelAndFeatures
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 

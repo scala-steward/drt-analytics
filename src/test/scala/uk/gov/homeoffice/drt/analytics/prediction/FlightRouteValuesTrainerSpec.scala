@@ -7,9 +7,8 @@ import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.specs2.execute.StandardResults.skipped
 import uk.gov.homeoffice.drt.actor.PredictionModelActor._
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.GetState
+import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
