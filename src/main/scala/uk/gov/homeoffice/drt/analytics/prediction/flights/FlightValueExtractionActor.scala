@@ -5,7 +5,8 @@ import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
+import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightValueExtractionActor.{PreProcessingFinished, noCtaOrDomestic}
 import uk.gov.homeoffice.drt.arrivals.Arrival

@@ -3,11 +3,13 @@ package uk.gov.homeoffice.drt.analytics.actors
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
 import akka.persistence.SaveSnapshotSuccess
-import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
+import akka.persistence.testkit.{PersistenceTestKitPlugin, PersistenceTestKitSnapshotPlugin}
+import akka.persistence.testkit.scaladsl.{PersistenceTestKit, SnapshotTestKit}
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.SpecificationLike
-import org.specs2.specification.{AfterAll, BeforeEach}
+import org.specs2.specification.BeforeEach
 import uk.gov.homeoffice.drt.analytics.{DailyPaxCountsOnDay, OriginTerminalDailyPaxCountsOnDay}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
@@ -26,20 +28,19 @@ class SnapshotTestPassengersActor(now: () => SDateLike, daysToRetain: Int, probe
   }
 }
 
-class PassengersActorSpec extends TestKit(ActorSystem("passengers-actor")) with SpecificationLike with AfterAll with BeforeEach {
+class PassengersActorSpec extends {
+  private val config = PersistenceTestKitPlugin.config.withFallback(PersistenceTestKitSnapshotPlugin.config.withFallback(ConfigFactory.load))
+} with TestKit(ActorSystem("passengers-actor", config)) with SpecificationLike with BeforeEach {
   sequential
 
-  override def before(): Unit = {
-    val tp = TestProbe()
-    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
-    tp.expectMsg(akka.actor.Status.Success(""))
-    tp.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
-    tp.expectMsg(akka.actor.Status.Success(""))
+  val persistenceTestKit: PersistenceTestKit = PersistenceTestKit(system)
+  val snapshotTestKit: SnapshotTestKit = SnapshotTestKit(system)
+
+  override def before: Unit = {
+    persistenceTestKit.clearAll()
+    snapshotTestKit.clearAll()
   }
 
-  override def afterAll(): Unit = {
-    TestKit.shutdownActorSystem(system)
-  }
 
   implicit val timeout: Timeout = new Timeout(5.second)
 
