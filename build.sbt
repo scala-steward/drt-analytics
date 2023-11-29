@@ -16,7 +16,7 @@ lazy val jodaTimeVersion = "2.12.5"
 lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.15.2"
 lazy val specs2Version = "4.20.0"
-lazy val sparkVersion = "3.4.1"
+lazy val sparkVersion = "3.5.0"
 lazy val scalaTestVersion = "3.2.16"
 lazy val catsVersion = "2.9.0"
 lazy val awsJava2SdkVersion = "2.13.73"
@@ -31,8 +31,8 @@ libraryDependencies ++= Seq(
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
-  "org.apache.spark" %% "spark-mllib" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
-  "org.apache.spark" %% "spark-sql" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
+  "org.apache.spark" %% "spark-mllib" % sparkVersion,
+  "org.apache.spark" %% "spark-sql" % sparkVersion,
   "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
@@ -45,7 +45,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
-  "uk.gov.homeoffice" %% "drt-lib" % drtLib excludeAll("org.scala-lang.modules", "scala-xml"),
+  "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
   "com.typesafe" %% "ssl-config-core" % sslConfigCore,
