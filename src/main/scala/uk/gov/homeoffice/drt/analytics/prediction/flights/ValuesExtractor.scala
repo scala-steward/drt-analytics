@@ -9,7 +9,8 @@ import org.slf4j.LoggerFactory
 import scalapb.GeneratedMessage
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.{ArrivalKey, GetState}
+import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
+import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.time.{SDateLike, UtcDate}
@@ -59,7 +60,7 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
       }
       .recoverWith {
         case t: Throwable =>
-          log.error(s"Failed to get arrivals for $terminal $date", t.getMessage)
+          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
           actor ! PoisonPill
           Future.failed(t)
       }
