@@ -146,4 +146,9 @@ steps:
       - Unit tests
       - Publish app
 
+services:
+  - name: NVD mirror service
+    image: sspringett/nvdmirror
+    ports:
+      - 8008
 ...
