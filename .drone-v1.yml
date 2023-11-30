@@ -8,41 +8,7 @@ platform:
   arch: amd64
 
 steps:
-  - name: analysis
-    pull: if-not-exists
-    image: quay.io/ukhomeofficedigital/scala-sbt-nodejs:v1.0.0
-    commands:
-      - /root/entrypoint.sh
-      - sbt -ivy ./.ivy2 dependencyCheck
-      - sbt -ivy ./.ivy2 -mem 4096 -J-XX:+UseG1GC clean coverage test coverageReport
-      - sbt scalastyle | true
-      - sbt scapegoat | true
-    environment:
-      ARTIFACTORY_PASSWORD:
-        from_secret: ARTIFACTORY_PASSWORD
-      ARTIFACTORY_USERNAME: drt-artifactory-robot
-      ENV_LOG_LEVEL: ERROR
-    when:
-      event:
-        - push
-    failure: ignore
-
-  - name: sonar-scanner
-    pull: if-not-exists
-    image: quay.io/ukhomeofficedigital/sonar-scanner:v4.6
-    commands:
-      - sonar-scanner -Dsonar.projectVersion=B${DRONE_BUILD_NUMBER}
-    environment:
-      DRONE_BUILD_NUMBER: ${DRONE_BUILD_NUMBER}
-    when:
-      branch:
-        - ${DRONE_BRANCH}
-      event:
-        - push
-    depends_on:
-      - analysis
-
-  - name: Test back end
+  - name: Unit tests
     pull: if-not-exists
     image: quay.io/ukhomeofficedigital/scala-sbt:latest
     commands:
@@ -70,9 +36,9 @@ steps:
       event:
         - push
     depends_on:
-      - Test back end
+      - Unit tests
 
-  - name: Publish
+  - name: Publish app
     image: plugins/ecr
     environment:
       AWS_REGION: eu-west-2
@@ -92,7 +58,79 @@ steps:
     depends_on:
       - Build docker image
 
-  - name: slack_notification
+  - name: Code coverage report
+    pull: if-not-exists
+    image: quay.io/ukhomeofficedigital/scala-sbt:latest
+    commands:
+      - /root/entrypoint.sh
+      - sbt -mem 4096 --error test coverage | true
+      - sbt coverageReport
+    environment:
+      ARTIFACTORY_PASSWORD:
+        from_secret: ARTIFACTORY_PASSWORD
+      ARTIFACTORY_USERNAME: drt-artifactory-robot
+      ENV_LOG_LEVEL: ERROR
+    when:
+      event:
+        - push
+    depends_on:
+      - Unit tests
+
+  - name: Scapegoat
+    pull: if-not-exists
+    image: quay.io/ukhomeofficedigital/scala-sbt:latest
+    commands:
+      - /root/entrypoint.sh
+      - sbt scapegoat | true
+    environment:
+      NVD_BASE_URL: http://nvdmirror:8008
+      ARTIFACTORY_PASSWORD:
+        from_secret: ARTIFACTORY_PASSWORD
+      ARTIFACTORY_USERNAME: drt-artifactory-robot
+      ENV_LOG_LEVEL: ERROR
+    when:
+      event:
+        - push
+    #      branch:
+    #        - master
+    depends_on:
+      - Code coverage report
+
+  - name: Dependency check
+    pull: if-not-exists
+    image: quay.io/ukhomeofficedigital/scala-sbt:latest
+    commands:
+      - /root/entrypoint.sh
+      - sbt -mem 4096 dependencyCheckAggregate
+    environment:
+      ARTIFACTORY_PASSWORD:
+        from_secret: ARTIFACTORY_PASSWORD
+      ARTIFACTORY_USERNAME: drt-artifactory-robot
+      ENV_LOG_LEVEL: ERROR
+    when:
+      event:
+        - push
+    #      branch:
+    #        - master
+    depends_on:
+      - Scapegoat
+
+  - name: Sonar scanner
+    pull: if-not-exists
+    image: quay.io/ukhomeofficedigital/sonar-scanner:v4.6
+    commands:
+      - sonar-scanner -Dsonar.projectVersion=B${DRONE_BUILD_NUMBER} -X
+    environment:
+      DRONE_BUILD_NUMBER: ${DRONE_BUILD_NUMBER}
+    when:
+      event:
+        - push
+    #      branch:
+    #        - master
+    depends_on:
+      - Dependency check
+
+  - name: Slack notification
     pull: if-not-exists
     image: plugins/slack
     settings:
@@ -105,7 +143,7 @@ steps:
       event:
         - push
     depends_on:
-      - Test back end
-      - Publish
+      - Unit tests
+      - Publish app
 
 ...
