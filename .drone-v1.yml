@@ -101,8 +101,9 @@ steps:
     image: quay.io/ukhomeofficedigital/scala-sbt:latest
     commands:
       - /root/entrypoint.sh
-      - sbt -mem 4096 dependencyCheckAggregate
+      - sbt -mem 4096 dependencyCheck
     environment:
+      NVD_BASE_URL: http://nvdmirror:8008
       ARTIFACTORY_PASSWORD:
         from_secret: ARTIFACTORY_PASSWORD
       ARTIFACTORY_USERNAME: drt-artifactory-robot
