@@ -153,7 +153,7 @@ case class FlightRouteValuesTrainer(modelName: String,
       case ((labelValue, oneToManyFeatureValues, singleFeatureValues), idx) => Row(labelValue +: (oneToManyFeatureValues ++ singleFeatureValues) :+ idx.toString: _*)
     }.toList.asJava
 
-    session.createDataFrame(rows, schema).sort("label")
+    session.createDataFrame(rows, schema).sort("index")
   }
 
   private def removeOutliers(dataFrame: Dataset[Row]): Dataset[Row] = {
