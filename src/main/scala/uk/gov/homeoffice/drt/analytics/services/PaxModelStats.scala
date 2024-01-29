@@ -59,7 +59,7 @@ object PaxModelStats {
                       timeout: Timeout
                      ): Future[Seq[Arrival]] = {
     val maybePointInTime = maybeForecastAheadDays.map(d => SDate(date).addDays(-d).millisSinceEpoch)
-    val actor = system.actorOf(Props(classOf[FlightsActor], terminal, date, maybePointInTime))
+    val actor = system.actorOf(Props(new FlightsActor(terminal, date, maybePointInTime)))
     actor
       .ask(GetState).mapTo[Seq[Arrival]]
       .flatMap { arrivals =>

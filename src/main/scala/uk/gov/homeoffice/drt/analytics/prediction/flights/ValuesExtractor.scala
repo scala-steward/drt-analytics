@@ -60,7 +60,7 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
       }
       .recoverWith {
         case t: Throwable =>
-          log.error(s"Failed to get arrivals for $terminal $date", t.getMessage)
+          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
           actor ! PoisonPill
           Future.failed(t)
       }

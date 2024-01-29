@@ -3,25 +3,23 @@ ThisBuild / scalaVersion := "2.13.12"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
-//ThisBuild / scapegoatVersion := "2.1.2"
 
-lazy val drtLib = "v20231129_1"
+lazy val drtLib = "v672"
 
 lazy val akkaHttpVersion = "10.5.3"
 lazy val akkaVersion = "2.8.5"
 lazy val akkaPersistenceJdbcVersion = "5.2.0"
-lazy val akkaPersistenceInMemoryVersion = "2.5.15.2"
-lazy val postgresVersion = "42.5.4"
+lazy val postgresVersion = "42.7.0"
 lazy val jodaTimeVersion = "2.12.5"
 lazy val logbackContribVersion = "0.1.5"
-lazy val jacksonDatabindVersion = "2.15.2"
-lazy val specs2Version = "4.20.0"
-lazy val sparkVersion = "3.4.1"
-lazy val scalaTestVersion = "3.2.16"
-lazy val catsVersion = "2.9.0"
-lazy val awsJava2SdkVersion = "2.13.73"
+lazy val jacksonDatabindVersion = "2.15.3"
+lazy val specs2Version = "4.20.3"
+lazy val sparkVersion = "3.5.0"
+lazy val scalaTestVersion = "3.2.17"
+lazy val catsVersion = "2.10.0"
+lazy val awsJava2SdkVersion = "2.13.76"
 lazy val sslConfigCore = "0.6.1"
-lazy val scalaXmlVersion = "2.1.0"
+lazy val scalaXmlVersion = "2.2.0"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -31,21 +29,21 @@ libraryDependencies ++= Seq(
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
-  "org.apache.spark" %% "spark-mllib" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
-  "org.apache.spark" %% "spark-sql" % sparkVersion excludeAll("org.scala-lang.modules", "scala-xml"),
+  "org.apache.spark" %% "spark-mllib" % sparkVersion,
+  "org.apache.spark" %% "spark-sql" % sparkVersion,
   "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
-  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
+  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
-  "com.github.dnvriend" %% "akka-persistence-inmemory" % akkaPersistenceInMemoryVersion % "test",
+  "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
   "com.lightbend.akka" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
   "org.postgresql" % "postgresql" % postgresVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
-  "uk.gov.homeoffice" %% "drt-lib" % drtLib excludeAll("org.scala-lang.modules", "scala-xml"),
+  "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
   "com.typesafe" %% "ssl-config-core" % sslConfigCore,

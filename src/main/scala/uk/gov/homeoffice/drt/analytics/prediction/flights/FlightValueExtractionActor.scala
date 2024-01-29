@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 object FlightValueExtractionActor {
   case class PreProcessingFinished(byArrivalKey: Map[ArrivalKey, Arrival])
 
-  val noCtaOrDomestic: FlightWithSplitsMessage => Boolean = msg => !isDomesticOrCta(PortCode(msg.getFlight.origin.get))
+  val noCtaOrDomestic: FlightWithSplitsMessage => Boolean = msg => !isDomesticOrCta(PortCode(msg.getFlight.getOrigin))
 }
 
 object FlightMessageConversions {
