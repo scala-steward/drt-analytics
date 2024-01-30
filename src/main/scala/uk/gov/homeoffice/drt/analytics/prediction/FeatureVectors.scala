@@ -13,8 +13,10 @@ object FeatureVectors {
   def featuresVectorForRow(row: Row, features: FeaturesWithOneToManyValues): linalg.Vector =
     Vectors.dense(oneToManyFeaturesIndices(row, features) ++ singleFeaturesVector(row, features))
 
-  def oneToManyFeaturesIndices(row: Row, features: FeaturesWithOneToManyValues): Array[Double] =
-    Vectors.sparse(features.oneToManyValues.size, oneToManyIndices(row, features).map(idx => (idx, 1d))).toArray
+  def oneToManyFeaturesIndices(row: Row, features: FeaturesWithOneToManyValues): Array[Double] = {
+    val sortedIndices = oneToManyIndices(row, features).sorted.map(idx => (idx, 1d))
+    Vectors.sparse(features.oneToManyValues.size, sortedIndices).toArray
+  }
 
   def singleFeaturesVector(row: Row, features: FeaturesWithOneToManyValues): List[Double] = features.features.collect {
     case feature: Single[_] => row.getAs[Double](feature.label)
