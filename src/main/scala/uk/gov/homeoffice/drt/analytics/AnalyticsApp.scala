@@ -12,7 +12,7 @@ import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions._
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.{noopPreProcess, populateMaxPax}
-import uk.gov.homeoffice.drt.analytics.services.{ModelAccuracy, PassengerCounts, PaxModelStats}
+import uk.gov.homeoffice.drt.analytics.services.{ModelAccuracy, PassengerCounts}
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal

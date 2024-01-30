@@ -4,7 +4,6 @@ import org.apache.spark.ml.linalg
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, Row}
-import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, Single}
 
@@ -37,11 +36,6 @@ object FeatureVectors {
       }
       .filter(_ >= 0)
 
-  def labelAndFeatureCols(allColumns: Iterable[String],
-                          labelColName: String,
-                          features: List[Feature[_]]
-                         ): immutable.Seq[Column] = {
-    val featureColumns = features.map(ft => col(ft.label))
-    col(labelColName) :: (featureColumns ++ allColumns.map(col))
-  }
+  def labelAndFeatureCols(allColumns: Iterable[String], labelColName: String): immutable.Seq[Column] =
+    col(labelColName) +: allColumns.map(col).toList
 }

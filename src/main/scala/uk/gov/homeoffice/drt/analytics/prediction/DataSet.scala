@@ -46,7 +46,7 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
                               (implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
-    val labelAndFeatures: Seq[Column] = FeatureVectors.labelAndFeatureCols(df.columns, labelColName, features)
+    val labelAndFeatures = FeatureVectors.labelAndFeatureCols(df.columns, labelColName)
 
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 
