@@ -3,10 +3,15 @@ package uk.gov.homeoffice.drt.analytics.prediction
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, OneToMany, Single}
 
+import scala.util.Try
+
 case class DataSet(df: DataFrame, features: List[Feature[_]]) {
+  private val log = LoggerFactory.getLogger(getClass)
+
   val dfIndexed: DataFrame = df.withColumn("_index", monotonically_increasing_id())
 
   val numRows: Long = dfIndexed.count()
@@ -54,9 +59,17 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
       .collect.toSeq
       .map { row =>
         val label = row.getAs[Double](0)
-        val featuresVector = FeatureVectors.featuresVectorForRow(row, featuresWithOneToManyValues)
         val index = row.getAs[String]("index")
-        (label, featuresVector, index)
+        Try(FeatureVectors.featuresVectorForRow(row, featuresWithOneToManyValues)) match {
+          case scala.util.Success(featuresVector) =>
+            Option((label, featuresVector, index))
+          case scala.util.Failure(t) =>
+            log.error(s"Failed to create features vector for row $row. Features: $featuresWithOneToManyValues", t)
+            None
+        }
+      }
+      .collect {
+        case Some((label, featuresVector, index)) => (label, featuresVector, index)
       }
       .toDF("label", "features", "index")
   }

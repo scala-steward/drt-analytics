@@ -4,10 +4,12 @@ import org.apache.spark.ml.linalg
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, Row}
+import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, Single}
 
 import scala.collection.immutable
+import scala.util.{Failure, Success, Try}
 
 object FeatureVectors {
   def featuresVectorForRow(row: Row, features: FeaturesWithOneToManyValues): linalg.Vector =
@@ -15,7 +17,12 @@ object FeatureVectors {
 
   def oneToManyFeaturesIndices(row: Row, features: FeaturesWithOneToManyValues): Array[Double] = {
     val sortedIndices = oneToManyIndices(row, features).sorted.map(idx => (idx, 1d))
-    Vectors.sparse(features.oneToManyValues.size, sortedIndices).toArray
+
+    Try(Vectors.sparse(features.oneToManyValues.size, sortedIndices).toArray) match {
+      case Success(arr) => arr
+      case Failure(t) =>
+        throw new Exception(s"Failed to create sparse vector from ${features.oneToManyValues.size} indices: $sortedIndices", t)
+    }
   }
 
   def singleFeaturesVector(row: Row, features: FeaturesWithOneToManyValues): List[Double] = features.features.collect {
