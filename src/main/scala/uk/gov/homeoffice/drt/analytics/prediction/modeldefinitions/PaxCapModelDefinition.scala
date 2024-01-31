@@ -28,7 +28,7 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     Term3a(),
     SummerHalfTerm(),
     Term3b(),
-    PreSummerHoliday(),
+    SummerHolidayScotland(),
     SummerHoliday(),
     DayOfWeek(),
     Carrier,

@@ -5,16 +5,24 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, Row}
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, Single}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Single
 
 import scala.collection.immutable
+import scala.util.{Failure, Success, Try}
 
 object FeatureVectors {
   def featuresVectorForRow(row: Row, features: FeaturesWithOneToManyValues): linalg.Vector =
     Vectors.dense(oneToManyFeaturesIndices(row, features) ++ singleFeaturesVector(row, features))
 
-  def oneToManyFeaturesIndices(row: Row, features: FeaturesWithOneToManyValues): Array[Double] =
-    Vectors.sparse(features.oneToManyValues.size, oneToManyIndices(row, features).map(idx => (idx, 1d))).toArray
+  def oneToManyFeaturesIndices(row: Row, features: FeaturesWithOneToManyValues): Array[Double] = {
+    val sortedIndices = oneToManyIndices(row, features).sorted.map(idx => (idx, 1d))
+
+    Try(Vectors.sparse(features.oneToManyValues.size, sortedIndices).toArray) match {
+      case Success(arr) => arr
+      case Failure(t) =>
+        throw new Exception(s"Failed to create sparse vector from ${features.oneToManyValues.size} indices: $sortedIndices", t)
+    }
+  }
 
   def singleFeaturesVector(row: Row, features: FeaturesWithOneToManyValues): List[Double] = features.features.collect {
     case feature: Single[_] => row.getAs[Double](feature.label)
@@ -28,11 +36,6 @@ object FeatureVectors {
       }
       .filter(_ >= 0)
 
-  def labelAndFeatureCols(allColumns: Iterable[String],
-                          labelColName: String,
-                          features: List[Feature[_]]
-                         ): immutable.Seq[Column] = {
-    val featureColumns = features.map(ft => col(ft.label))
-    col(labelColName) :: (featureColumns ++ allColumns.map(col))
-  }
+  def labelAndFeatureCols(allColumns: Iterable[String], labelColName: String): immutable.Seq[Column] =
+    col(labelColName) +: allColumns.map(col).toList
 }

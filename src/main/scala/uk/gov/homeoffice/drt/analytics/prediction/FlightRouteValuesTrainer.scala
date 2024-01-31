@@ -150,13 +150,15 @@ case class FlightRouteValuesTrainer(modelName: String,
     val schema = StructType(labelField +: fields :+ indexField)
 
     val rows = valuesZippedWithIndex.map {
-      case ((labelValue, oneToManyFeatureValues, singleFeatureValues), idx) => Row(labelValue +: (oneToManyFeatureValues ++ singleFeatureValues) :+ idx.toString: _*)
+      case ((labelValue, oneToManyFeatureValues, singleFeatureValues), idx) =>
+        val values = labelValue +: (oneToManyFeatureValues ++ singleFeatureValues) :+ idx.toString
+        Row(values: _*)
     }.toList.asJava
 
-    session.createDataFrame(rows, schema).sort("label")
+    session.createDataFrame(rows, schema).sort("index")
   }
 
-  private def removeOutliers(dataFrame: Dataset[Row]): Dataset[Row] = {
+  private def removeOutliers(dataFrame: Dataset[Row]): Dataset[Row] =
     dataFrame.stat.approxQuantile("label", Array(0.25, 0.75), 0.0) match {
       case quantiles if quantiles.length == 2 =>
         val q1 = quantiles(0)
@@ -167,5 +169,4 @@ case class FlightRouteValuesTrainer(modelName: String,
         dataFrame.filter(s"$lowerRange <= label and label <= $upperRange")
       case _ => dataFrame
     }
-  }
 }
