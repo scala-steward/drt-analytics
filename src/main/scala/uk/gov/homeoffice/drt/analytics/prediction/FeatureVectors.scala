@@ -5,7 +5,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, Row}
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, Single}
+import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Single
 
 import scala.collection.immutable
 import scala.util.{Failure, Success, Try}
