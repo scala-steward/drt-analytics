@@ -146,6 +146,12 @@ steps:
       status: [ success, failure ]
       event:
         - push
+    template: >
+      {{#success build.status}}
+        build {{build.number}} on {{build.branch}} succeeded. Good job.
+      {{else}}
+        build {{build.number}} on {{build.branch}} failed. Fix me please.
+      {{/success}}
 
 services:
   - name: NVD mirror service
