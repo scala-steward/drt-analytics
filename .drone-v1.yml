@@ -146,6 +146,8 @@ steps:
       status: [ success, failure ]
 #      event:
 #        - push
+    depends_on:
+      - Unit tests
     template: >
       {{#success build.status}}
         build {{build.number}} on {{build.branch}} succeeded. Good job.
