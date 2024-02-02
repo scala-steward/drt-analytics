@@ -1,7 +1,7 @@
 ---
 kind: pipeline
 name: default
-type: docker
+type: kubernetes
 
 platform:
   os: linux
@@ -133,7 +133,7 @@ steps:
     depends_on:
       - Dependency check
 
-  - name: Slack notification
+  - name: Slack notification success
     pull: if-not-exists
     image: plugins/slack@v1.4.1
     settings:
@@ -143,7 +143,22 @@ steps:
       SLACK_WEBHOOK:
         from_secret: slack_webhook
     when:
-      status: [ success, failure ]
+      status: [ success ]
+      event: push
+    depends_on:
+      - Unit tests
+
+  - name: Slack notification failure
+    pull: if-not-exists
+    image: plugins/slack@v1.4.1
+    settings:
+      channel: devs
+      template: "*{{repo.name}}: _{{build.status}}_*\nCompleted build *{{build.number}}* after *{{since build.started}}* on *{{build.branch}}*\n{{build.link}}\n"
+    environment:
+      SLACK_WEBHOOK:
+        from_secret: slack_webhook
+    when:
+      status: [ failure ]
       event: push
     depends_on:
       - Unit tests
