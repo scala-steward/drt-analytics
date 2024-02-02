@@ -160,8 +160,6 @@ steps:
     when:
       status: [ failure ]
       event: push
-    depends_on:
-      - Unit tests
 
 services:
   - name: NVD mirror service
