@@ -144,8 +144,8 @@ steps:
         from_secret: slack_webhook
     when:
       status: [ success, failure ]
-      event:
-        - push
+#      event:
+#        - push
     template: >
       {{#success build.status}}
         build {{build.number}} on {{build.branch}} succeeded. Good job.
