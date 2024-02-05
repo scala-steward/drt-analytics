@@ -33,10 +33,7 @@ object FeatureVectors {
       .map { fs =>
         val featureValue = row.getAs[String](fs.label)
         val idx = features.oneToManyValues.indexOf(featureValue)
-        val value = featureValue match {
-          case "no" => 0d
-          case _ => 1d
-        }
+        val value = if (featureValue == s"${fs.prefix}_no") 0d else 1d
         (idx, value)
       }
       .filter(_._1 >= 0)

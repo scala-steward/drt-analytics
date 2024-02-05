@@ -54,9 +54,9 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
     val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
     actor
       .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]]
-      .map { arrivals =>
+      .map { featuresAndValuesForDate =>
         actor ! PoisonPill
-        arrivals
+        featuresAndValuesForDate
       }
       .recoverWith {
         case t: Throwable =>

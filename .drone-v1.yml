@@ -143,23 +143,10 @@ steps:
       SLACK_WEBHOOK:
         from_secret: slack_webhook
     when:
-      status: [ success ]
+      status: [ success, failure ]
       event: push
     depends_on:
       - Unit tests
-
-  - name: Slack notification failure
-    pull: if-not-exists
-    image: plugins/slack@v1.4.1
-    settings:
-      channel: devs
-      template: "*{{repo.name}}: _{{build.status}}_*\nCompleted build *{{build.number}}* after *{{since build.started}}* on *{{build.branch}}*\n{{build.link}}\n"
-    environment:
-      SLACK_WEBHOOK:
-        from_secret: slack_webhook
-    when:
-      status: [ failure ]
-      event: push
 
 services:
   - name: NVD mirror service
