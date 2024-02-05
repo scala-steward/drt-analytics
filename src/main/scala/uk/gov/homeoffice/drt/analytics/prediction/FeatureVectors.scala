@@ -15,7 +15,7 @@ object FeatureVectors {
     Vectors.dense(oneToManyFeaturesIndices(row, features) ++ singleFeaturesVector(row, features))
 
   def oneToManyFeaturesIndices(row: Row, features: FeaturesWithOneToManyValues): Array[Double] = {
-    val sortedIndices = oneToManyIndices(row, features).sorted.map(idx => (idx, 1d))
+    val sortedIndices = oneToManyIndices(row, features).sortBy(_._1)
 
     Try(Vectors.sparse(features.oneToManyValues.size, sortedIndices).toArray) match {
       case Success(arr) => arr
@@ -28,13 +28,18 @@ object FeatureVectors {
     case feature: Single[_] => row.getAs[Double](feature.label)
   }
 
-  def oneToManyIndices(row: Row, features: FeaturesWithOneToManyValues): Seq[Int] =
+  def oneToManyIndices(row: Row, features: FeaturesWithOneToManyValues): Seq[(Int, Double)] =
     features.oneToManyFeatures
       .map { fs =>
         val featureValue = row.getAs[String](fs.label)
-        features.oneToManyValues.indexOf(featureValue)
+        val idx = features.oneToManyValues.indexOf(featureValue)
+        val value = featureValue match {
+          case "no" => 0d
+          case _ => 1d
+        }
+        (idx, value)
       }
-      .filter(_ >= 0)
+      .filter(_._1 >= 0)
 
   def labelAndFeatureCols(allColumns: Iterable[String], labelColName: String): immutable.Seq[Column] =
     col(labelColName) +: allColumns.map(col).toList
