@@ -29,7 +29,6 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
   def trainModel(labelCol: String, trainingSplitPercentage: Int)
                 (implicit session: SparkSession): LinearRegressionModel =
     new LinearRegression()
-      .setMaxIter(10)
       .fit(prepareDataFrame(labelCol, trainingSplitPercentage, sortAscending = true))
 
   def evaluate(labelCol: String, trainingSplitPercentage: Int, model: LinearRegressionModel)

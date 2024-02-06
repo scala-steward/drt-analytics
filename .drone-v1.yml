@@ -133,7 +133,7 @@ steps:
     depends_on:
       - Dependency check
 
-  - name: Slack notification success
+  - name: Slack notification
     pull: if-not-exists
     image: plugins/slack
     settings:

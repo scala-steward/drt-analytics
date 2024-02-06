@@ -56,11 +56,11 @@ object AnalyticsApp extends App {
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
         case "update-off-schedule-models" =>
-          trainModels(OffScheduleModelDefinition, portConfig.terminals, noopPreProcess)
+          trainModels(OffScheduleModelDefinition, portConfig.terminals, noopPreProcess, 0.1, 0.9)
 
         case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-          trainModels(ToChoxModelDefinition(baselineTimeToChox), portConfig.terminals, noopPreProcess)
+          trainModels(ToChoxModelDefinition(baselineTimeToChox), portConfig.terminals, noopPreProcess, 0.1, 0.9)
 
         case "update-walk-time-models" =>
           val gatesPath = config.getString("options.gates-walk-time-file-path")
@@ -72,10 +72,11 @@ object AnalyticsApp extends App {
           val maybeStandsFile = Option(standsPath).filter(fileExists)
 
           log.info(s"Loading walk times from ${maybeGatesFile.toList ++ maybeStandsFile.toList}")
-          trainModels(WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis), portConfig.terminals, noopPreProcess)
+          val modelDef = WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis)
+          trainModels(modelDef, portConfig.terminals, noopPreProcess, 0.1, 0.9)
 
         case "update-pax-cap-models" =>
-          trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax())
+          trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax(), 0.1, 0.9)
 
         case "dump-daily-pax-cap" =>
           ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName)
@@ -97,7 +98,9 @@ object AnalyticsApp extends App {
 
   private def trainModels[T](modDef: ModelDefinition[T, Terminal],
                              terminals: Iterable[Terminal],
-                             preProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]]
+                             preProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
+                             lowerQuantile: Double,
+                             upperQuantile: Double,
                             ): Future[Done] = {
     val examplesProvider = ValuesExtractor(
       classOf[FlightValueExtractionActor],
@@ -107,7 +110,16 @@ object AnalyticsApp extends App {
     ).extractValuesByKey
     val persistence = Flight()
 
-    val trainer = FlightRouteValuesTrainer(modDef.modelName, modDef.features, examplesProvider, persistence, modDef.baselineValue, daysOfTrainingData)
+    val trainer = FlightRouteValuesTrainer(
+      modDef.modelName,
+      modDef.features,
+      examplesProvider,
+      persistence,
+      modDef.baselineValue,
+      daysOfTrainingData,
+      lowerQuantile,
+      upperQuantile,
+    )
 
     trainer
       .trainTerminals(terminals.toList)
