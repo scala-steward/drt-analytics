@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
-import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
+import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id, rand}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
@@ -53,8 +53,9 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
 
     dfIndexed
       .select(labelAndFeatures: _*)
-      .sort(sortBy)
+      .sort(rand)
       .limit(partitionIndexValue)
+//      .sort(rand)
       .collect.toSeq
       .map { row =>
         val label = row.getAs[Double](0)

@@ -16,7 +16,7 @@ import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.UniqueArrivalMessage
 import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flightWithSplitsFromMessage
-import uk.gov.homeoffice.drt.time.UtcDate
+import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -73,9 +73,18 @@ trait FlightValueExtractionActorLike {
         case (_, msg) => extractKey(msg)
       }
       .collect {
-        case (Some(key), flightMessages) =>
-          val examples = flightMessages
-            .map { case (_, msg) => extractValues(msg) }
+        case (Some(key), arrivals) =>
+          val examples = arrivals
+            .map { case (_, arrival) =>
+              val values = extractValues(arrival)
+              val scheduled = SDate(arrival.Scheduled)
+              if (scheduled.getMonth == 12 /*&& scheduled.getDate >= 18*/)
+              values match {
+                case Some((cap, oneToMany, _)) => log.info(f"${scheduled.prettyDateTime} ${arrival.Origin.iata}: $cap%.1f, ${oneToMany.mkString(", ")}")
+                case None => log.info(s"${arrival.flightCode} ${scheduled.prettyDateTime}: No values")
+              }
+              values
+            }
             .collect { case Some(value) => value }
           (key, examples)
       }

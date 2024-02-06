@@ -17,6 +17,7 @@ import uk.gov.homeoffice.drt.prediction.arrival.{ArrivalModelAndFeatures, PaxCap
 import uk.gov.homeoffice.drt.prediction.persistence.Flight
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike, UtcDate}
 
+import java.io.{File, FileWriter}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -73,11 +74,14 @@ object ModelAccuracy {
       .mapAsync(1) {
         case (terminal, results) =>
           val csvContent = (csvHeader :: results.map(_._2).toList).mkString("\n")
+          val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-${port}-${terminal}.csv"))
+          fileWriter.write(csvContent)
+          fileWriter.close()
           Utils.writeToBucket(bucketName, s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
             .map(_ => (terminal, results))
             .recover {
               case t: Throwable =>
-                log.error(s"Failed to write to bucket", t.getMessage)
+                log.error(s"Failed to write to bucket: ${t.getMessage}")
                 (terminal, results)
             }
       }

@@ -45,7 +45,7 @@ case class FlightRouteValuesTrainer(modelName: String,
     Source(terminals)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
-        train(daysOfTrainingData, 20, terminal).map(r => logStats(terminal, r))
+        train(daysOfTrainingData, 40, terminal).map(r => logStats(terminal, r))
           .recover {
             case t =>
               log.error(s"Failed to train $modelName for $terminal", t)
