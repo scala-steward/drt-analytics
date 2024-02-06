@@ -75,16 +75,7 @@ trait FlightValueExtractionActorLike {
       .collect {
         case (Some(key), arrivals) =>
           val examples = arrivals
-            .map { case (_, arrival) =>
-              val values = extractValues(arrival)
-              val scheduled = SDate(arrival.Scheduled)
-              if (scheduled.getMonth == 12 /*&& scheduled.getDate >= 18*/)
-              values match {
-                case Some((cap, oneToMany, _)) => log.info(f"${scheduled.prettyDateTime} ${arrival.Origin.iata}: $cap%.1f, ${oneToMany.mkString(", ")}")
-                case None => log.info(s"${arrival.flightCode} ${scheduled.prettyDateTime}: No values")
-              }
-              values
-            }
+            .map { case (_, arrival) => extractValues(arrival) }
             .collect { case Some(value) => value }
           (key, examples)
       }
@@ -97,6 +88,7 @@ class FlightValueExtractionActor(val terminal: Terminal,
                                  val preProcessing: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
                                 ) extends TerminalDateActor[Arrival] with PersistentActor with FlightValueExtractionActorLike {
   private val log: Logger = LoggerFactory.getLogger(getClass)
+
   override def persistenceId: String = f"terminal-flights-${terminal.toString.toLowerCase}-${date.year}-${date.month}%02d-${date.day}%02d"
 
   implicit val ec: ExecutionContextExecutor = context.dispatcher

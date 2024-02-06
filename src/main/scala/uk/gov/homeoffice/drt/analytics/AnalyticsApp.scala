@@ -77,7 +77,7 @@ object AnalyticsApp extends App {
 
         case "update-pax-cap-models" =>
           trainModels(PaxCapModelDefinition, portConfig.terminals, populateMaxPax(), 0.1, 0.9)
-            .flatMap(_ => ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName))
+//            .flatMap(_ => ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName))
 
         case "dump-daily-pax-cap" =>
           ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName)
