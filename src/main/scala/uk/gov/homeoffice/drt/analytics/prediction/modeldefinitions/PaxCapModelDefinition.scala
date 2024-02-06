@@ -35,7 +35,7 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     SummerHolidayScotland(),
     SummerHoliday(),
     DayOfWeek(),
-//    Carrier,
+    Carrier,
     Origin,
     FlightNumber,
 //    PostPandemicRecovery(SDate("2022-06-01T00:00:00Z")),
