@@ -135,7 +135,7 @@ steps:
 
   - name: Slack notification success
     pull: if-not-exists
-    image: plugins/slack@v1.4.1
+    image: plugins/slack
     settings:
       channel: devs
       template: "*{{repo.name}}: _{{build.status}}_*\nCompleted build *{{build.number}}* after *{{since build.started}}* on *{{build.branch}}*\n{{build.link}}\n"
