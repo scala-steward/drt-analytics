@@ -9,6 +9,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor._
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
+import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
@@ -60,7 +61,7 @@ class FlightRouteValuesTrainerSpec
       val probe = TestProbe("test-probe")
 
       val trainer1 = getTrainer(examples(1), probe.ref)
-      trainer1.trainTerminals("LHR", List(T2), false)
+      trainer1.trainTerminals("LHR", List(T2), None)
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
       trainer1.session.stop()
     }
@@ -69,7 +70,7 @@ class FlightRouteValuesTrainerSpec
       val probe = TestProbe("test-probe")
 
       val trainer2 = getTrainer(examples(10), probe.ref)
-      trainer2.trainTerminals("LHR", List(T2), false)
+      trainer2.trainTerminals("LHR", List(T2), None)
       probe.expectMsg(60.seconds, "model update")
       trainer2.session.stop()
     }

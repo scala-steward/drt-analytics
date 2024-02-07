@@ -20,15 +20,15 @@ object Utils {
       .build()
   }
 
-  def writeToBucket(bucketName: String, fileName: String, content: String)
-                   (implicit client: S3AsyncClient): Future[PutObjectResponse] = {
-    val putObjectRequest = PutObjectRequest.builder()
-      .bucket(bucketName)
-      .key(fileName)
-      .build()
+  def writeToBucket(client: S3AsyncClient, bucketName: String): (String, String) => Future[PutObjectResponse] =
+    (fileName: String, content: String) => {
+      val putObjectRequest = PutObjectRequest.builder()
+        .bucket(bucketName)
+        .key(fileName)
+        .build()
 
-    val asyncRequestBody = AsyncRequestBody.fromString(content)
+      val asyncRequestBody = AsyncRequestBody.fromString(content)
 
-    client.putObject(putObjectRequest, asyncRequestBody).asScala
-  }
+      client.putObject(putObjectRequest, asyncRequestBody).asScala
+    }
 }

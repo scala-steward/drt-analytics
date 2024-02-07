@@ -77,7 +77,7 @@ object ModelAccuracy {
           val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-${port}-${terminal}.csv"))
           fileWriter.write(csvContent)
           fileWriter.close()
-          Utils.writeToBucket(bucketName, s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
+          Utils.writeToBucket(s3Client, bucketName)(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
             .map(_ => (terminal, results))
             .recover {
               case t: Throwable =>
