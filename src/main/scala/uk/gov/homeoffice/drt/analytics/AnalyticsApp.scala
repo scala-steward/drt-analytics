@@ -83,15 +83,12 @@ object AnalyticsApp extends App {
           val arrivals: (Terminal, LocalDate) => Future[Seq[Arrival]] = (terminal, localDate) => {
             val sdate = SDate(localDate)
             val utcDates = Set(sdate.toUtcDate, sdate.addDays(1).addMinutes(-1).toUtcDate)
-            println(s"Looking for arrivals for $terminal with Utc dates: $utcDates")
             Source(utcDates.toList)
               .mapAsync(1) { utcDate =>
                 val actor = system.actorOf(Props(new FlightsActor(terminal, utcDate, None)))
-                println(s"Asing for state for $terminal on $utcDate")
                 actor
                   .ask(GetState)
                   .mapTo[Seq[Arrival]].map { arrivals =>
-                    println(s"Got reply: ${arrivals.length} arrivals for $terminal on $utcDate")
                     actor ! PoisonPill
                     arrivals
                       .filter { a =>

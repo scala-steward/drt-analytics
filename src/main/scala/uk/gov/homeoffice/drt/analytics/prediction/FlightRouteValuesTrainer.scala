@@ -221,11 +221,13 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
         val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
         val csvContent = stats
           .foldLeft(csvHeader + "\n") {
-            case (acc, (date, actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, flightCount)) =>
+            case (acc, (date, actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, flightCount)) =>
               val predDiff = (predPax - actPax).toDouble / actPax * 100
               val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
               val actPaxPerFlight = actPax.toDouble / flightCount
               val predPaxPerFlight = predPax.toDouble / flightCount
+              val actCapPct = actPax.toDouble / flightCount
+              val predCapPct = predPax.toDouble / flightCount
               acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCapPct%.2f,$predCapPct%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
           }
         fileWriter.write(csvContent)
@@ -271,7 +273,6 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
           val actualCapOrig = paxCounts.map(_._2).sum
           val flightCount = paxCounts.length
 
-          println(s"Getting arrivals for $date")
           arrivalsForDate(terminal, date)
             .recoverWith {
               case t =>
@@ -279,14 +280,12 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
                 Future.successful(Seq())
             }
             .map { arrivals =>
-              println(s"Got ${arrivals.length} arrivals for $date")
-
               val maybeArrivalStats: Array[Option[(Int, Int, Int, Double, Double, Double)]] = for {
                 (predCap, _, _, keyStr) <- paxCounts
                 arrival <- arrivals.find(_.unique.stringValue == keyStr)
               } yield {
                 arrival.MaxPax.filter(_ > 0).map { maxPax =>
-                  val predPax = predCap * maxPax
+                  val predPax = predCap * maxPax / 100
                   val actualPax = arrival.bestPaxEstimate(Seq(LiveFeedSource, ApiFeedSource)).passengers.getPcpPax.getOrElse(0)
                   val actualCapPct = 100 * actualPax.toDouble / maxPax
                   val forecastPax = arrival.bestPaxEstimate(Seq(ForecastFeedSource, HistoricApiFeedSource, AclFeedSource)).passengers.getPcpPax.getOrElse(0)
@@ -295,16 +294,14 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
                 }
               }
 
-              println(s"Found ${maybeArrivalStats.length} arrival stats for $date with ${arrivals.length} arrivals")
-
               val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = maybeArrivalStats
                 .collect {
                   case Some((actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)) =>
                     (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)
                 }
                 .foldLeft((0, 0, 0, 0d, 0d, 0d)) {
-                  case ((actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1)) =>
-                    (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCapPct + actCapPct1, predCapPct + predCapPct1, fcstCapPct + fcstCapPct1)
+                  case ((actPax, predPax, fcstPax, actCap, predCap, fcstCapPct), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1)) =>
+                    (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCap + actCapPct1, predCap + predCapPct1, fcstCapPct + fcstCapPct1)
                 }
 
               if (actualCapOrig != actCapPct) {
