@@ -1,5 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
+import akka.pattern.StatusReply
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.{Done, NotUsed}
@@ -11,14 +12,14 @@ import org.joda.time.DateTimeZone
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, RegressionModelFromSpark, WithId}
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
-import uk.gov.homeoffice.drt.ports.Terminals
+import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
+import uk.gov.homeoffice.drt.ports._
 import uk.gov.homeoffice.drt.prediction.Persistence
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Feature
 import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike}
 
 import java.io.{File, FileWriter}
-import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.SeqHasAsJava
 
@@ -47,7 +48,7 @@ case class FlightRouteValuesTrainer(modelName: String,
     .config("spark.master", "local")
     .getOrCreate()
 
-  def trainTerminals(portCode: String, terminals: List[Terminal], dumpStats: Option[(String, String) => Unit]): Future[Done] =
+  def trainTerminals(portCode: String, terminals: List[Terminal], dumpStats: Option[PaxStatsDump]): Future[Done] =
     Source(terminals)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
@@ -75,7 +76,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                     validationSetPct: Int,
                     portCode: String,
                     terminal: Terminals.Terminal,
-                    dumpStats: Option[(String, String) => Unit],
+                    dumpStats: Option[PaxStatsDump],
                    ): Future[Seq[Option[Double]]] = {
 
     val start = SDate.now().addDays(-1)
@@ -103,16 +104,17 @@ case class FlightRouteValuesTrainer(modelName: String,
               val dataSet = DataSet(withoutOutliers, features).shuffle()
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
               val improvementPct = calculateImprovementPct(dataSet, allExamples, lrModel, validationSetPct, baselineValue(terminal))
-              dumpStats.foreach(dumper => dumpDailyStats(dataSet, allExamples, lrModel, portCode, terminal.toString, dumper))
+
               val regressionModel = RegressionModelFromSpark(lrModel)
               val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
               persistence
                 .updateModel(modelIdentifier, modelName, Option(modelUpdate))
                 .map(_ => Some(improvementPct))
-                .recover {
-                  case t =>
-                    log.error(s"Failed to update model for $modelIdentifier", t)
-                    None
+                .flatMap { stats =>
+                  dumpStats match {
+                    case Some(dumper) => dumper.dumpDailyStats(dataSet, allExamples, lrModel, portCode, terminal.toString).map(_ => stats)
+                    case None => Future.successful(StatusReply.Ack).map(_ => stats)
+                  }
                 }
           }
       }
@@ -153,83 +155,6 @@ case class FlightRouteValuesTrainer(modelName: String,
     pctImprovement
   }
 
-  private def dumpDailyStats(dataSet: DataSet,
-                             withIndex: Iterable[(Double, Seq[String], Seq[Double], String)],
-                             model: LinearRegressionModel,
-                             port: String,
-                             terminal: String,
-                             dumpStats: (String, String) => Unit,
-                            ): Unit = {
-    log.info(s"Dumping daily stats for $terminal")
-    val csvHeader = Seq(
-      "Date",
-      "Terminal",
-      "Actual pax",
-      "Pred pax",
-      "Flights",
-      "Actual per flight",
-      "Predicted per flight",
-      "Actual % cap",
-      "Pred % cap",
-      "Pred diff %",
-      "Fcst pax",
-      "Fcst % cap",
-      "Fcst diff %").mkString(",")
-
-    val stats = capacityStats(dataSet, model, withIndex)
-    log.info(s"Got ${stats.size} days of stats for $terminal")
-    val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
-    val csvContent = stats
-      .foldLeft(csvHeader + "\n") {
-        case (acc, (date, predictedCap, actualCap, flightCount)) =>
-          val predDiff = (predictedCap - actualCap) / actualCap * 100
-          val actCapPerFlight = actualCap / flightCount
-          val predCapPerFlight = predictedCap / flightCount
-          acc + f"${date.toISOString},$terminal,$actualCap,$predictedCap,$flightCount,n/a,n/a,$actCapPerFlight%.2f,$predCapPerFlight%.2f,$predDiff%.2f,n/a,n/a,n/a\n"
-      }
-    fileWriter.write(csvContent)
-    dumpStats(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
-    fileWriter.close()
-  }
-
-  private def capacityStats(dataSet: DataSet,
-                            model: LinearRegressionModel,
-                            withIndex: Iterable[(Double, Seq[String], Seq[Double], String)],
-                           ): immutable.Iterable[(LocalDate, Double, Double, Int)] =
-    dataSet
-      .predict("label", 0, model)
-      .rdd
-      .map { row =>
-        val idx = row.getAs[String]("index")
-        withIndex
-          .find { case (_, _, _, key) => key == idx }
-          .map {
-            case (label, _, _, key) =>
-              val prediction = Math.round(row.getAs[Double]("prediction"))
-              val localDate = SDate(key.split("-")(2).toLong, DateTimeZone.forID("Europe/London")).toLocalDate
-              (prediction.toDouble, label, localDate)
-          }
-      }
-      .collect()
-      .map { m =>
-        if (m.isEmpty) println(s"No data")
-        m
-      }
-      .collect {
-        case Some(data) => data
-      }
-      .groupBy {
-        case (_, _, date) => date
-      }
-      .map {
-        case (date, paxCounts) =>
-          val predictedCap = paxCounts.map(_._1).sum
-          val actualCap = paxCounts.map(_._2).sum
-          val flightCount = paxCounts.length
-          (date, predictedCap, actualCap, flightCount)
-      }
-      .toSeq.sortBy(_._1)
-
   private def prepareDataFrame(featureColumnNames: Seq[String], valuesZippedWithIndex: Iterable[(Double, Seq[String], Seq[Double], String)])
                               (implicit session: SparkSession): Dataset[Row] = {
     val labelField = StructField("label", DoubleType, nullable = false)
@@ -260,4 +185,140 @@ case class FlightRouteValuesTrainer(modelName: String,
         dataFrame.filter(s"$lowerRange <= label and label <= $upperRange")
       case _ => dataFrame
     }
+}
+
+case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
+                        dumpStats: (String, String) => Unit)
+                       (implicit ec: ExecutionContext, mat: Materializer) {
+  private val log = LoggerFactory.getLogger(getClass)
+
+  def dumpDailyStats(dataSet: DataSet,
+                     withIndex: Iterable[(Double, Seq[String], Seq[Double], String)],
+                     model: LinearRegressionModel,
+                     port: String,
+                     terminal: String,
+                    )
+                    (implicit sparkSession: SparkSession): Future[StatusReply[Done]] = {
+    log.info(s"Dumping daily stats for $terminal")
+    val csvHeader = Seq(
+      "Date",
+      "Terminal",
+      "Actual pax",
+      "Pred pax",
+      "Flights",
+      "Actual per flight",
+      "Predicted per flight",
+      "Actual % cap",
+      "Pred % cap",
+      "Pred diff %",
+      "Fcst pax",
+      "Fcst % cap",
+      "Fcst diff %").mkString(",")
+
+    capacityStats(dataSet, withIndex, model, Terminal(terminal), arrivalsForDate)
+      .map { stats =>
+        log.info(s"Got ${stats.size} days of stats for $terminal")
+        val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
+        val csvContent = stats
+          .foldLeft(csvHeader + "\n") {
+            case (acc, (date, actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, flightCount)) =>
+              val predDiff = (predPax - actPax).toDouble / actPax * 100
+              val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
+              val actPaxPerFlight = actPax.toDouble / flightCount
+              val predPaxPerFlight = predPax.toDouble / flightCount
+              acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCapPct%.2f,$predCapPct%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
+          }
+        fileWriter.write(csvContent)
+        dumpStats(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
+        fileWriter.close()
+        StatusReply.Ack
+      }
+  }
+
+  private def capacityStats(dataSet: DataSet,
+                            withIndex: Iterable[(Double, Seq[String], Seq[Double], String)],
+                            model: LinearRegressionModel,
+                            terminal: Terminal,
+                            arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
+                           )
+                           (implicit sparkSession: SparkSession): Future[Seq[(LocalDate, Int, Int, Int, Double, Double, Double, Int)]] = {
+    val dailyPredictions = dataSet
+      .predict("label", 0, model)
+      .rdd
+      .map { row =>
+        val idx = row.getAs[String]("index")
+        withIndex
+          .find { case (_, _, _, key) => key == idx }
+          .map {
+            case (label, _, _, key) =>
+              val prediction = Math.round(row.getAs[Double]("prediction"))
+              val scheduled = key.split("-")(2).toLong
+              val localDate = SDate(scheduled, DateTimeZone.forID("Europe/London")).toLocalDate
+              (prediction.toDouble, label, localDate, key)
+          }
+      }
+      .collect()
+      .collect {
+        case Some(data) => data
+      }
+      .groupBy {
+        case (_, _, date, _) => date
+      }
+
+    Source(dailyPredictions)
+      .mapAsync(1) {
+        case (date, paxCounts) =>
+          val actualCapOrig = paxCounts.map(_._2).sum
+          val flightCount = paxCounts.length
+
+          println(s"Getting arrivals for $date")
+          arrivalsForDate(terminal, date)
+            .recoverWith {
+              case t =>
+                log.error(s"Failed to get arrivals for $date", t)
+                Future.successful(Seq())
+            }
+            .map { arrivals =>
+              println(s"Got ${arrivals.length} arrivals for $date")
+
+              val maybeArrivalStats: Array[Option[(Int, Int, Int, Double, Double, Double)]] = for {
+                (predCap, _, _, keyStr) <- paxCounts
+                arrival <- arrivals.find(_.unique.stringValue == keyStr)
+              } yield {
+                arrival.MaxPax.filter(_ > 0).map { maxPax =>
+                  val predPax = predCap * maxPax
+                  val actualPax = arrival.bestPaxEstimate(Seq(LiveFeedSource, ApiFeedSource)).passengers.getPcpPax.getOrElse(0)
+                  val actualCapPct = 100 * actualPax.toDouble / maxPax
+                  val forecastPax = arrival.bestPaxEstimate(Seq(ForecastFeedSource, HistoricApiFeedSource, AclFeedSource)).passengers.getPcpPax.getOrElse(0)
+                  val forecastCapPct = 100 * forecastPax.toDouble / maxPax
+                  (actualPax, predPax.round.toInt, forecastPax, actualCapPct, predCap, forecastCapPct)
+                }
+              }
+
+              println(s"Found ${maybeArrivalStats.length} arrival stats for $date with ${arrivals.length} arrivals")
+
+              val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = maybeArrivalStats
+                .collect {
+                  case Some((actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)) =>
+                    (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)
+                }
+                .foldLeft((0, 0, 0, 0d, 0d, 0d)) {
+                  case ((actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1)) =>
+                    (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCapPct + actCapPct1, predCapPct + predCapPct1, fcstCapPct + fcstCapPct1)
+                }
+
+              if (actualCapOrig != actCapPct) {
+                log.warn(s"Actual cap changed from $actualCapOrig to $actCapPct for $date")
+              }
+              (date, actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, flightCount)
+            }
+      }
+      .runWith(Sink.seq)
+      .recover {
+        case t =>
+          log.error(s"Failed to get capacity stats for $terminal", t)
+          Seq()
+      }
+      .map(_.sortBy(_._1))
+  }
 }
