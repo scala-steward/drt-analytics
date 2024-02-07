@@ -1,7 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.pattern.StatusReply.Ack
 import akka.stream.scaladsl.Source
 import akka.testkit.{TestKit, TestProbe}
 import akka.util.Timeout
@@ -9,7 +8,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor._
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
-import uk.gov.homeoffice.drt.analytics.s3.Utils
+import uk.gov.homeoffice.drt.analytics.actors.Ack
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
 import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory

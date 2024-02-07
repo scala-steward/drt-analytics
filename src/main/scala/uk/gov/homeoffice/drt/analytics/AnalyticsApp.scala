@@ -79,7 +79,7 @@ object AnalyticsApp extends App {
           trainModels(modelDef, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, None)
 
         case "update-pax-cap-models" =>
-          val dumpStats: (String, String) => Unit = (f, c) => Utils.writeToBucket(s3AsyncClient, bucketName)(f, c).map(_ => {})
+          val dumpStats: (String, String) => Future[Done] = (f, c) => Utils.writeToBucket(s3AsyncClient, bucketName)(f, c).map(_ => Done)
           val arrivals: (Terminal, LocalDate) => Future[Seq[Arrival]] = (terminal, localDate) => {
             val sdate = SDate(localDate)
             val utcDates = Set(sdate.toUtcDate, sdate.addDays(1).addMinutes(-1).toUtcDate)

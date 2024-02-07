@@ -1,6 +1,5 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.pattern.StatusReply
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.{Done, NotUsed}
@@ -113,7 +112,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                 .flatMap { stats =>
                   dumpStats match {
                     case Some(dumper) => dumper.dumpDailyStats(dataSet, allExamples, lrModel, portCode, terminal.toString).map(_ => stats)
-                    case None => Future.successful(StatusReply.Ack).map(_ => stats)
+                    case None => Future.successful(Done).map(_ => stats)
                   }
                 }
           }
@@ -188,7 +187,7 @@ case class FlightRouteValuesTrainer(modelName: String,
 }
 
 case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
-                        dumpStats: (String, String) => Unit)
+                        dumpStats: (String, String) => Future[Done])
                        (implicit ec: ExecutionContext, mat: Materializer) {
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -198,7 +197,7 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
                      port: String,
                      terminal: String,
                     )
-                    (implicit sparkSession: SparkSession): Future[StatusReply[Done]] = {
+                    (implicit sparkSession: SparkSession): Future[Done] = {
     log.info(s"Dumping daily stats for $terminal")
     val csvHeader = Seq(
       "Date",
@@ -216,7 +215,7 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
       "Fcst diff %").mkString(",")
 
     capacityStats(dataSet, withIndex, model, Terminal(terminal), arrivalsForDate)
-      .map { stats =>
+      .flatMap { stats =>
         log.info(s"Got ${stats.size} days of stats for $terminal")
         val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
         val csvContent = stats
@@ -229,9 +228,8 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
               acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCap%.2f,$predCap%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
           }
         fileWriter.write(csvContent)
-        dumpStats(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
         fileWriter.close()
-        StatusReply.Ack
+        dumpStats(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
       }
   }
 
