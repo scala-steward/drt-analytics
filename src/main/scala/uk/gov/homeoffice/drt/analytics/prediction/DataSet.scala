@@ -49,13 +49,9 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
 
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 
-    val sortBy = if (sortAscending) $"_index".asc else $"_index".desc
-
     dfIndexed
       .select(labelAndFeatures: _*)
-      .sort(rand)
       .limit(partitionIndexValue)
-//      .sort(rand)
       .collect.toSeq
       .map { row =>
         val label = row.getAs[Double](0)
@@ -73,4 +69,6 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
       }
       .toDF("label", "features", "index")
   }
+
+  def shuffle(): DataSet = copy(df = dfIndexed.sort(rand))
 }

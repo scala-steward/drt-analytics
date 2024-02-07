@@ -10,7 +10,7 @@ trait ModelDefinition[T, B] {
 
   def aggregateValue: T => Option[WithId]
 
-  def targetValueAndFeatures: T => Option[(Double, Seq[String], Seq[Double])]
+  def targetValueAndFeatures: T => Option[(Double, Seq[String], Seq[Double], String)]
 
   def baselineValue: B => Double
 }

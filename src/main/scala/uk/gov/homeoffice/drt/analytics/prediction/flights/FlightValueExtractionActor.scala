@@ -45,7 +45,7 @@ trait FlightValueExtractionActorLike {
 
   var byArrivalKey: Map[ArrivalKey, Arrival] = Map()
 
-  val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])]
+  val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double], String)]
   val extractKey: Arrival => Option[WithId]
 
   def processSnapshot(ss: Any): Unit = ss match {
@@ -67,7 +67,7 @@ trait FlightValueExtractionActorLike {
     msg.removals.foreach(processRemovalMessage)
   }
 
-  def extractions(byArrivalKeyProcessed: Map[ArrivalKey, Arrival]): Map[WithId, immutable.Iterable[(Double, Seq[String], Seq[Double])]] =
+  def extractions(byArrivalKeyProcessed: Map[ArrivalKey, Arrival]): Map[WithId, immutable.Iterable[(Double, Seq[String], Seq[Double], String)]] =
     byArrivalKeyProcessed
       .groupBy {
         case (_, msg) => extractKey(msg)
@@ -83,7 +83,7 @@ trait FlightValueExtractionActorLike {
 
 class FlightValueExtractionActor(val terminal: Terminal,
                                  val date: UtcDate,
-                                 val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])],
+                                 val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double], String)],
                                  val extractKey: Arrival => Option[WithId],
                                  val preProcessing: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
                                 ) extends TerminalDateActor[Arrival] with PersistentActor with FlightValueExtractionActorLike {
@@ -93,7 +93,7 @@ class FlightValueExtractionActor(val terminal: Terminal,
 
   implicit val ec: ExecutionContextExecutor = context.dispatcher
 
-  var valuesWithFeaturesByExtractedKey: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]] = Map()
+  var valuesWithFeaturesByExtractedKey: Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]] = Map()
   var preProcessingFinished = false
   var stateRequests: List[ActorRef] = List()
 

@@ -41,7 +41,7 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
 //    PostPandemicRecovery(SDate("2022-06-01T00:00:00Z")),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalId.fromArrival
-  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = {
+  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = {
     val featuresAreUnique = features.map(_.prefix).groupBy(identity).map(_._2.size).forall(_ == 1)
     assert(featuresAreUnique, () => s"Features must have unique prefixes: ${features.map(_.prefix)}")
     percentCapacity(features)

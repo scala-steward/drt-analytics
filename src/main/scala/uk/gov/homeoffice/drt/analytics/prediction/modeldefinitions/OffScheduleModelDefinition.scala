@@ -20,6 +20,6 @@ object OffScheduleModelDefinition extends ModelDefinition[Arrival, Terminal] {
     FlightNumber,
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalOrigin.fromArrival
-  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = minutesOffSchedule(features)
+  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = minutesOffSchedule(features)
   override val baselineValue: Terminal => Double = (_: Terminal) => 0d
 }

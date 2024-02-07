@@ -52,15 +52,15 @@ class FlightRouteValuesTrainerSpec
   }
 
   "FlightRouteValuesTrainer" should {
-    val example = (1.0, Seq("car_1", "pod_1"), Seq())
+    val example = (1.0, Seq("car_1", "pod_1"), Seq(), "")
 
-    def examples(n: Int): Iterable[(Double, Seq[String], Seq[Double])] = Iterable.fill(n)(example)
+    def examples(n: Int): Iterable[(Double, Seq[String], Seq[Double], String)] = Iterable.fill(n)(example)
 
     "Send a RemoveModel when there are too few training examples" in {
       val probe = TestProbe("test-probe")
 
       val trainer1 = getTrainer(examples(1), probe.ref)
-      trainer1.trainTerminals(List(T2))
+      trainer1.trainTerminals("LHR", List(T2), false)
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
       trainer1.session.stop()
     }
@@ -69,13 +69,13 @@ class FlightRouteValuesTrainerSpec
       val probe = TestProbe("test-probe")
 
       val trainer2 = getTrainer(examples(10), probe.ref)
-      trainer2.trainTerminals(List(T2))
+      trainer2.trainTerminals("LHR", List(T2), false)
       probe.expectMsg(60.seconds, "model update")
       trainer2.session.stop()
     }
   }
 
-  private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double])], probe: ActorRef): FlightRouteValuesTrainer = {
+  private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double], String)], probe: ActorRef): FlightRouteValuesTrainer = {
     implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
     FlightRouteValuesTrainer(
       "some-model",
@@ -85,7 +85,9 @@ class FlightRouteValuesTrainerSpec
       },
       MockPersistence(probe),
       _ => 1000d,
-      10
+      10,
+      0.1,
+      0.9
     )
   }
 }

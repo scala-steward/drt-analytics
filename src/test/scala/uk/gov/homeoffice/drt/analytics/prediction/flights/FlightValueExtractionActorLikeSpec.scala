@@ -62,7 +62,7 @@ class FlightValueExtractionActorLikeSpec extends AnyWordSpec with Matchers {
 
   private def newMock: FlightValueExtractionActorLike =
     new FlightValueExtractionActorLike {
-      override val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])] = _ => None
+      override val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = _ => None
       override val extractKey: Arrival => Option[PredictionModelActor.WithId] = _ => None
     }
 
