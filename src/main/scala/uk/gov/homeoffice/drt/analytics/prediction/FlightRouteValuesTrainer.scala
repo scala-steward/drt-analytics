@@ -179,7 +179,6 @@ case class FlightRouteValuesTrainer(modelName: String,
     val stats = capacityStats(dataSet, model, withIndex)
     log.info(s"Got ${stats.size} days of stats for $terminal")
     val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
-    fileWriter.write(csvHeader + "\n")
     val csvContent = stats
       .foldLeft(csvHeader + "\n") {
         case (acc, (date, predictedCap, actualCap, flightCount)) =>
