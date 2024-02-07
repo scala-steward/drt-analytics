@@ -9,8 +9,10 @@ import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructTy
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.joda.time.DateTimeZone
 import org.slf4j.LoggerFactory
+import software.amazon.awssdk.services.s3.S3AsyncClient
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.{ModelUpdate, RegressionModelFromSpark, WithId}
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
+import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.ports.Terminals
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.Persistence
@@ -34,6 +36,11 @@ case class FlightRouteValuesTrainer(modelName: String,
                                     daysOfTrainingData: Int,
                                     lowerQuantile: Double,
                                     upperQuantile: Double,
+                                   )
+                                   (implicit
+                                    executionContext: ExecutionContext,
+                                    s3Client: S3AsyncClient,
+                                    mat: Materializer,
                                    ) {
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -43,12 +50,11 @@ case class FlightRouteValuesTrainer(modelName: String,
     .config("spark.master", "local")
     .getOrCreate()
 
-  def trainTerminals(portCode: String, terminals: List[Terminal], dumpStats: Boolean)
-                    (implicit ec: ExecutionContext, mat: Materializer): Future[Done] =
+  def trainTerminals(portCode: String, terminals: List[Terminal], dumpStats: Boolean, bucketName: String): Future[Done] =
     Source(terminals)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
-        train(daysOfTrainingData, 40, portCode, terminal, dumpStats).map(r => logStats(terminal, r))
+        train(daysOfTrainingData, 40, portCode, terminal, dumpStats, bucketName).map(r => logStats(terminal, r))
           .recover {
             case t =>
               log.error(s"Failed to train $modelName for $terminal", t)
@@ -72,8 +78,9 @@ case class FlightRouteValuesTrainer(modelName: String,
                     validationSetPct: Int,
                     portCode: String,
                     terminal: Terminals.Terminal,
-                    dumpStats: Boolean)
-                   (implicit mat: Materializer, executionContext: ExecutionContext): Future[Seq[Option[Double]]] = {
+                    dumpStats: Boolean,
+                    bucketName: String,
+                   ): Future[Seq[Option[Double]]] = {
 
     val start = SDate.now().addDays(-1)
 
@@ -100,7 +107,7 @@ case class FlightRouteValuesTrainer(modelName: String,
               val dataSet = DataSet(withoutOutliers, features).shuffle()
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
               val improvementPct = calculateImprovementPct(dataSet, allExamples, lrModel, validationSetPct, baselineValue(terminal))
-              if (dumpStats) dumpDailyStats(dataSet, allExamples, lrModel, portCode, terminal.toString)
+              if (dumpStats) dumpDailyStats(dataSet, allExamples, lrModel, portCode, terminal.toString, bucketName)
               val regressionModel = RegressionModelFromSpark(lrModel)
               val modelUpdate = ModelUpdate(regressionModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
               persistence
@@ -155,6 +162,11 @@ case class FlightRouteValuesTrainer(modelName: String,
                              model: LinearRegressionModel,
                              port: String,
                              terminal: String,
+                             bucketName: String,
+                            )
+                            (implicit
+                             executionContext: ExecutionContext,
+                             s3Client: S3AsyncClient
                             ): Unit = {
     log.info(s"Dumping daily stats for $terminal")
     val csvHeader = Seq(
@@ -176,14 +188,19 @@ case class FlightRouteValuesTrainer(modelName: String,
     log.info(s"Got ${stats.size} days of stats for $terminal")
     val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
     fileWriter.write(csvHeader + "\n")
-    stats
-      .foreach {
-        case (date, predictedCap, actualCap, flightCount) =>
+    val csvContent = stats
+      .foldLeft(csvHeader + "\n") {
+        case (acc, (date, predictedCap, actualCap, flightCount)) =>
           val predDiff = (predictedCap - actualCap) / actualCap * 100
           val actCapPerFlight = actualCap / flightCount
           val predCapPerFlight = predictedCap / flightCount
-          val csvRow = f"${date.toISOString},$terminal,$actualCap,$predictedCap,$flightCount,n/a,n/a,$actCapPerFlight%.2f,$predCapPerFlight%.2f,$predDiff%.2f,n/a,n/a,n/a\n"
-          fileWriter.write(csvRow)
+          acc + f"${date.toISOString},$terminal,$actualCap,$predictedCap,$flightCount,n/a,n/a,$actCapPerFlight%.2f,$predCapPerFlight%.2f,$predDiff%.2f,n/a,n/a,n/a\n"
+      }
+    fileWriter.write(csvContent)
+    Utils.writeToBucket(bucketName, s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
+      .recover {
+        case t: Throwable =>
+          log.error(s"Failed to write to bucket: ${t.getMessage}")
       }
     fileWriter.close()
   }

@@ -7,7 +7,6 @@ import com.typesafe.config.ConfigFactory
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
-import uk.gov.homeoffice.drt.analytics.AnalyticsApp.portCode
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions._
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
@@ -57,11 +56,11 @@ object AnalyticsApp extends App {
           PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
         case "update-off-schedule-models" =>
-          trainModels(OffScheduleModelDefinition, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, dumpStats = false)
+          trainModels(OffScheduleModelDefinition, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, dumpStats = false, bucketName)
 
         case "update-to-chox-models" =>
           val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-          trainModels(ToChoxModelDefinition(baselineTimeToChox), portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, dumpStats = false)
+          trainModels(ToChoxModelDefinition(baselineTimeToChox), portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, dumpStats = false, bucketName)
 
         case "update-walk-time-models" =>
           val gatesPath = config.getString("options.gates-walk-time-file-path")
@@ -74,10 +73,10 @@ object AnalyticsApp extends App {
 
           log.info(s"Loading walk times from ${maybeGatesFile.toList ++ maybeStandsFile.toList}")
           val modelDef = WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis)
-          trainModels(modelDef, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, dumpStats = false)
+          trainModels(modelDef, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, dumpStats = false, bucketName)
 
         case "update-pax-cap-models" =>
-          trainModels(PaxCapModelDefinition, portCode.iata, portConfig.terminals, populateMaxPax(), 0d, 1d, dumpStats = true)
+          trainModels(PaxCapModelDefinition, portCode.iata, portConfig.terminals, populateMaxPax(), 0d, 1d, dumpStats = true, bucketName)
 
         case "dump-daily-pax-cap" =>
           ModelAccuracy.analyse(daysOfTrainingData, portCode.iata, portConfig.terminals, paxCapModelCollector, bucketName)
@@ -104,6 +103,7 @@ object AnalyticsApp extends App {
                              lowerQuantile: Double,
                              upperQuantile: Double,
                              dumpStats: Boolean,
+                             bucketName: String,
                             ): Future[Done] = {
     val examplesProvider = ValuesExtractor(
       classOf[FlightValueExtractionActor],
@@ -125,7 +125,7 @@ object AnalyticsApp extends App {
     )
 
     trainer
-      .trainTerminals(portCode, terminals.toList, dumpStats)
+      .trainTerminals(portCode, terminals.toList, dumpStats, bucketName)
       .map { d =>
         trainer.session.stop()
         d
