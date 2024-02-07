@@ -226,9 +226,7 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
               val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
               val actPaxPerFlight = actPax.toDouble / flightCount
               val predPaxPerFlight = predPax.toDouble / flightCount
-              val actCapPct = actPax.toDouble / flightCount
-              val predCapPct = predPax.toDouble / flightCount
-              acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCapPct%.2f,$predCapPct%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
+              acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCap%.2f,$predCap%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
           }
         fileWriter.write(csvContent)
         dumpStats(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
@@ -307,7 +305,7 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
               if (actualCapOrig != actCapPct) {
                 log.warn(s"Actual cap changed from $actualCapOrig to $actCapPct for $date")
               }
-              (date, actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, flightCount)
+              (date, actPax, predPax, fcstPax, actCapPct / flightCount, predCapPct / flightCount, fcstCapPct / flightCount, flightCount)
             }
       }
       .runWith(Sink.seq)
