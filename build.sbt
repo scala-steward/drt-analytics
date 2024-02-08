@@ -11,7 +11,6 @@ lazy val akkaVersion = "2.8.5"
 lazy val akkaPersistenceJdbcVersion = "5.2.0"
 lazy val postgresVersion = "42.7.0"
 lazy val jodaTimeVersion = "2.12.5"
-//lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.15.3"
 lazy val specs2Version = "4.20.3"
 lazy val sparkVersion = "3.5.0"
@@ -24,8 +23,6 @@ lazy val log4jLayoutTemplateJsonVersion = "2.22.1"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-  //  "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
-  //  "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
   "org.apache.logging.log4j" % "log4j-layout-template-json" % log4jLayoutTemplateJsonVersion,
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
