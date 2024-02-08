@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](actorClass: Class[T],
                                                                              extractValues: _ => Option[(Double, Seq[String], Seq[Double], String)],
                                                                              extractKey: M => Option[WithId],
-                                                                             preProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
+                                                                             preProcess: (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]],
                                                                             )
                                                                             (implicit system: ActorSystem,
                                                                              ec: ExecutionContext,

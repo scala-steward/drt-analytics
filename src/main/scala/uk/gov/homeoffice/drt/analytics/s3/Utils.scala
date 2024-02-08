@@ -1,11 +1,12 @@
 package uk.gov.homeoffice.drt.analytics.s3
 
+import akka.Done
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncRequestBody
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{PutObjectRequest, PutObjectResponse}
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.CompletionStageOps
 
 
@@ -20,7 +21,8 @@ object Utils {
       .build()
   }
 
-  def writeToBucket(client: S3AsyncClient, bucketName: String): (String, String) => Future[PutObjectResponse] =
+  def writeToBucket(client: S3AsyncClient, bucketName: String)
+                   (implicit ec: ExecutionContext): (String, String) => Future[Done] =
     (fileName: String, content: String) => {
       val putObjectRequest = PutObjectRequest.builder()
         .bucket(bucketName)
@@ -29,6 +31,6 @@ object Utils {
 
       val asyncRequestBody = AsyncRequestBody.fromString(content)
 
-      client.putObject(putObjectRequest, asyncRequestBody).asScala
+      client.putObject(putObjectRequest, asyncRequestBody).asScala.map(_ => Done)
     }
 }
