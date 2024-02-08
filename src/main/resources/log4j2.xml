@@ -1,0 +1,25 @@
+<Configuration name="ConfigTest" status="INFO" monitorInterval="5">
+    <Appenders>
+        <Console name="ConsoleJson">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+        </Console>
+        <Console name="ConsolePattern">
+            <PatternLayout pattern="[%d{ISO8601}] [%level] [%logger] [%thread] [%X{akkaSource}] - %msg%n"/>
+        </Console>
+
+        <Routing name="Router">
+            <Routes pattern="$${env:LOG_FORMAT:-json}">
+                <Route ref="ConsoleJson" key="json"/>
+                <Route ref="ConsolePattern" key="pattern"/>
+            </Routes>
+        </Routing>
+    </Appenders>
+    <Loggers>
+        <Logger name="org.apache.spark" level="warn" additivity="false">
+            <AppenderRef ref="Router"/>
+        </Logger>
+        <Root level="info">
+            <AppenderRef ref="Router"/>
+        </Root>
+    </Loggers>
+</Configuration>
