@@ -31,7 +31,7 @@ case class ArrivalsProvider()
             actor ! PoisonPill
             arrivals
               .filter { a =>
-                SDate(a.Scheduled).toLocalDate == localDate && !a.Origin.isDomesticOrCta
+                SDate(a.Scheduled).toLocalDate == localDate && !a.Origin.isDomesticOrCta && !a.isCancelled
               }
               .map(a => (a.unique, a)).toMap.values.toSeq
           }

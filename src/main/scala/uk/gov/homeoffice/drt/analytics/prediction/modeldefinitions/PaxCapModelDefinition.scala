@@ -19,15 +19,11 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     Term1a(),
     OctoberHalfTerm(),
     Term1b(),
-//    PreChristmasHoliday(),
     ChristmasHoliday(),
-//    ChristmasHolidayFirstHalf(),
     ChristmasDay(),
-//    ChristmasHolidaySecondHalf(),
     Term2a(),
     SpringHalfTerm(),
     Term2b(),
-    PreEasterHoliday(),
     EasterHoliday(),
     Term3a(),
     SummerHalfTerm(),
@@ -38,7 +34,6 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     Carrier,
     Origin,
     FlightNumber,
-//    PostPandemicRecovery(SDate("2022-06-01T00:00:00Z")),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalId.fromArrival
   override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = {

@@ -137,7 +137,7 @@ case class FlightRouteValuesTrainer(modelName: String,
     val improvement = schMetrics.rootMeanSquaredError - predMetrics.rootMeanSquaredError
     val pctImprovement = (improvement / schMetrics.rootMeanSquaredError) * 100
 
-    log.info(s"RMSE = ${predMetrics.rootMeanSquaredError.round} pax Vs ${schMetrics.rootMeanSquaredError.round} pax -> ${improvement.round} pax improvement / ${pctImprovement.round}% improvement")
+    log.info(s"RMSE = ${predMetrics.rootMeanSquaredError.round} Vs ${schMetrics.rootMeanSquaredError.round} -> ${improvement.round} improvement / ${pctImprovement.round}% improvement")
 
     pctImprovement
   }

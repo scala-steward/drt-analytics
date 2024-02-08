@@ -6,7 +6,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
-import uk.gov.homeoffice.drt.analytics.prediction.dump.{ModelPredictionsDump, NoOpDump, PaxStatsDump}
+import uk.gov.homeoffice.drt.analytics.prediction.dump.{ModelPredictionsDump, NoOpDump, PaxPredictionDump}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{ArrivalsProvider, FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, PaxCapModelDefinition, ToChoxModelDefinition, WalkTimeModelDefinition}
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
@@ -58,7 +58,7 @@ case class JobExecutor(config: Config,
 
       case "update-pax-cap-models" =>
         val writePredictions = maybeWritePredictions.getOrElse((_: String, _: String) => Future.successful(Done))
-        val paxPredictionsDumper = PaxStatsDump(ArrivalsProvider().arrivals, writePredictions)
+        val paxPredictionsDumper = PaxPredictionDump(ArrivalsProvider().arrivals, writePredictions)
         trainModels(PaxCapModelDefinition, portCode.iata, portConfig.terminals, populateMaxPax(), 0d, 1d, paxPredictionsDumper)
 
       case unknown =>

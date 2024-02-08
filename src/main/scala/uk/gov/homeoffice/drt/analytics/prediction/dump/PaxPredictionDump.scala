@@ -16,9 +16,9 @@ import uk.gov.homeoffice.drt.time.{LocalDate, SDate}
 import java.io.{File, FileWriter}
 import scala.concurrent.{ExecutionContext, Future}
 
-case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
-                        dumpStats: (String, String) => Future[Done])
-                       (implicit ec: ExecutionContext, mat: Materializer) extends ModelPredictionsDump {
+case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
+                             dumpStats: (String, String) => Future[Done])
+                            (implicit ec: ExecutionContext, mat: Materializer) extends ModelPredictionsDump {
   private val log = LoggerFactory.getLogger(getClass)
 
   override def dumpDailyStats(dataSet: DataSet,
@@ -44,7 +44,9 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
       "Fcst % cap",
       "Fcst diff %").mkString(",")
 
-    capacityStats(dataSet, withIndex, model, Terminal(terminal), arrivalsForDate)
+    val predictions = predictionsWithLabels(dataSet, withIndex, model)
+
+    capacityStats(predictions, Terminal(terminal), arrivalsForDate)
       .flatMap { stats =>
         log.info(s"Got ${stats.size} days of stats for $terminal")
         val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
@@ -63,14 +65,12 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
       }
   }
 
-  private def capacityStats(dataSet: DataSet,
-                            withIndex: Iterable[(Double, Seq[String], Seq[Double], String)],
-                            model: LinearRegressionModel,
-                            terminal: Terminal,
-                            arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
-                           )
-                           (implicit sparkSession: SparkSession): Future[Seq[(LocalDate, Int, Int, Int, Double, Double, Double, Int)]] = {
-    val dailyPredictions = dataSet
+  private def predictionsWithLabels(dataSet: DataSet,
+                                    withIndex: Iterable[(Double, Seq[String], Seq[Double], String)],
+                                    model: LinearRegressionModel,
+                                   )
+                                   (implicit sparkSession: SparkSession): Map[LocalDate, Array[(Double, Double, String)]] =
+    dataSet
       .predict("label", 0, model)
       .rdd
       .map { row =>
@@ -82,7 +82,7 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
               val prediction = Math.round(row.getAs[Double]("prediction"))
               val scheduled = key.split("-")(2).toLong
               val localDate = SDate(scheduled, DateTimeZone.forID("Europe/London")).toLocalDate
-              (prediction.toDouble, label, localDate, key)
+              (label, prediction.toDouble, localDate, key)
           }
       }
       .collect()
@@ -92,11 +92,21 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
       .groupBy {
         case (_, _, date, _) => date
       }
+      .view.mapValues {
+        _.map {
+          case (label, predCap, _, key) => (label, predCap, key)
+        }
+      }
+      .toMap
 
-    Source(dailyPredictions)
+  private def capacityStats(predictionsWithLabels: Map[LocalDate, Array[(Double, Double, String)]],
+                            terminal: Terminal,
+                            arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
+                           ): Future[Seq[(LocalDate, Int, Int, Int, Double, Double, Double, Int)]] =
+    Source(predictionsWithLabels)
       .mapAsync(1) {
         case (date, paxCounts) =>
-          val actualCapOrig = paxCounts.map(_._2).sum
+          val actualCapOrig = paxCounts.map(_._1).sum
           val flightCount = paxCounts.length
 
           arrivalsForDate(terminal, date)
@@ -106,33 +116,12 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
                 Future.successful(Seq())
             }
             .map { arrivals =>
-              val maybeArrivalStats: Array[Option[(Int, Int, Int, Double, Double, Double)]] = for {
-                (predCap, _, _, keyStr) <- paxCounts
-                arrival <- arrivals.find(_.unique.stringValue == keyStr)
-              } yield {
-                arrival.MaxPax.filter(_ > 0).map { maxPax =>
-                  val predPax = predCap * maxPax / 100
-                  val actualPax = arrival.bestPaxEstimate(Seq(LiveFeedSource, ApiFeedSource)).passengers.getPcpPax.getOrElse(0)
-                  val actualCapPct = 100 * actualPax.toDouble / maxPax
-                  val forecastPax = arrival.bestPaxEstimate(Seq(ForecastFeedSource, HistoricApiFeedSource, AclFeedSource)).passengers.getPcpPax.getOrElse(0)
-                  val forecastCapPct = 100 * forecastPax.toDouble / maxPax
-                  (actualPax, predPax.round.toInt, forecastPax, actualCapPct, predCap, forecastCapPct)
-                }
-              }
-
-              val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = maybeArrivalStats
-                .collect {
-                  case Some((actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)) =>
-                    (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)
-                }
-                .foldLeft((0, 0, 0, 0d, 0d, 0d)) {
-                  case ((actPax, predPax, fcstPax, actCap, predCap, fcstCapPct), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1)) =>
-                    (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCap + actCapPct1, predCap + predCapPct1, fcstCapPct + fcstCapPct1)
-                }
+              val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = statsForArrivals(paxCounts, arrivals)
 
               if (Math.abs(actualCapOrig - actCapPct) > actualCapOrig * 0.1) {
                 log.warn(s"Actual cap changed by more than 10% from $actualCapOrig to $actCapPct for $date")
               }
+
               (date, actPax, predPax, fcstPax, actCapPct / flightCount, predCapPct / flightCount, fcstCapPct / flightCount, flightCount)
             }
       }
@@ -143,5 +132,31 @@ case class PaxStatsDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arr
           Seq()
       }
       .map(_.sortBy(_._1))
+
+  private def statsForArrivals(paxCounts: Array[(Double, Double, String)], arrivals: Seq[Arrival]): (Int, Int, Int, Double, Double, Double) = {
+    val maybeArrivalStats: Array[(Int, Int, Int, Double, Double, Double)] = for {
+      (_, predCap, keyStr) <- paxCounts
+      arrival <- arrivals.find { a =>
+        a.unique.stringValue == keyStr && !a.isCancelled
+      }
+      maxPax <- arrival.MaxPax.filter(_ > 0)
+      actualPax <- arrival.bestPcpPaxEstimate(Seq(LiveFeedSource, ApiFeedSource))
+    } yield {
+      val predPax = predCap * maxPax / 100
+      val actualCapPct = 100 * actualPax.toDouble / maxPax match {
+        case cap if cap > 100 => 100
+        case cap => cap
+      }
+      val forecastPax = arrival.bestPaxEstimate(Seq(ForecastFeedSource, HistoricApiFeedSource, AclFeedSource)).passengers.getPcpPax.getOrElse(0)
+      val forecastCapPct = 100 * forecastPax.toDouble / maxPax
+      (actualPax, predPax.round.toInt, forecastPax, actualCapPct, predCap, forecastCapPct)
+    }
+
+    val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = maybeArrivalStats
+      .foldLeft((0, 0, 0, 0d, 0d, 0d)) {
+        case ((actPax, predPax, fcstPax, actCap, predCap, fcstCapPct), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1)) =>
+          (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCap + actCapPct1, predCap + predCapPct1, fcstCapPct + fcstCapPct1)
+      }
+    (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)
   }
 }
