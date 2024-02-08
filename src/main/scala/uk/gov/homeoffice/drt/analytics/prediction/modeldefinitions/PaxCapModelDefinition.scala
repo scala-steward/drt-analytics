@@ -36,11 +36,7 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     FlightNumber,
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalId.fromArrival
-  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = {
-    val featuresAreUnique = features.map(_.prefix).groupBy(identity).map(_._2.size).forall(_ == 1)
-    assert(featuresAreUnique, () => s"Features must have unique prefixes: ${features.map(_.prefix)}")
-    percentCapacity(features)
-  }
+  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = percentCapacity(features)
   override val baselineValue: Terminal => Double = (_: Terminal) => 0d
 }
 
