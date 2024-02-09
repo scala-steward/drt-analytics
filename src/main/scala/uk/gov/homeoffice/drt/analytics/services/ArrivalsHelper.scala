@@ -10,6 +10,7 @@ import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 object ArrivalsHelper {
   private val log = LoggerFactory.getLogger(getClass)
@@ -21,11 +22,13 @@ object ArrivalsHelper {
                        ec: ExecutionContext,
                        timeout: Timeout): (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]] =
     (date, arrivals) => {
-      def pctWithMaxPax(arrivals: Iterable[Arrival]): Int = (100 * arrivals.count(_.MaxPax.isDefined).toDouble / arrivals.size).round.toInt
+      def pctWithMaxPax(arrivals: Iterable[Arrival]): Int = Try(
+        (100 * arrivals.count(_.MaxPax.isDefined).toDouble / arrivals.size).round.toInt
+      ).getOrElse(0)
 
       val pctOk = pctWithMaxPax(arrivals)
       if (pctOk < 80) {
-        log.info(s"Only $pctOk% of arrivals have max pax for $date, populating")
+        log.info(s"Only $pctOk% of ${arrivals.size} arrivals have max pax for $date, populating")
         val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, SDate(date)))
         arrivalsActor
           .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
@@ -41,7 +44,7 @@ object ArrivalsHelper {
           }
           .map{ a =>
             val pctOk = pctWithMaxPax(a)
-            log.info(s"Populated max pax for $date, now $pctOk% have max pax")
+            log.info(s"Populated max pax for $date, now $pctOk% of ${arrivals.size} arrivals have max pax")
             a
           }
           .recover {

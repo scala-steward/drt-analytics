@@ -22,7 +22,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 case class JobExecutor(config: Config,
-                       portCode: PortCode, maybeWritePredictions: Try[(String, String) => Future[Done]],
+                       portCode: PortCode,
+                       predictionWriters: Iterable[(String, String) => Future[Done]],
                        persistence: ModelPersistence,
                       )
                       (implicit ec: ExecutionContext, timeout: Timeout, system: ActorSystem) {
@@ -57,8 +58,10 @@ case class JobExecutor(config: Config,
         trainModels(modelDef, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, NoOpDump)
 
       case "update-pax-cap-models" =>
-        val writePredictions = maybeWritePredictions.getOrElse((_: String, _: String) => Future.successful(Done))
-        val paxPredictionsDumper = PaxPredictionDump(ArrivalsProvider().arrivals, writePredictions)
+        val paxPredictionsDumper =
+          if (predictionWriters.nonEmpty)
+            PaxPredictionDump(ArrivalsProvider().arrivals, predictionWriters)
+          else NoOpDump
         trainModels(PaxCapModelDefinition, portCode.iata, portConfig.terminals, populateMaxPax(), 0d, 1d, paxPredictionsDumper)
 
       case unknown =>

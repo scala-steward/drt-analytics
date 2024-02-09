@@ -13,11 +13,11 @@ import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports._
 import uk.gov.homeoffice.drt.time.{LocalDate, SDate}
 
-import java.io.{File, FileWriter}
 import scala.concurrent.{ExecutionContext, Future}
 
 case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
-                             dumpStats: (String, String) => Future[Done])
+                             predictionWriters: Iterable[(String, String) => Future[Done]],
+                            )
                             (implicit ec: ExecutionContext, mat: Materializer) extends ModelPredictionsDump {
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -49,7 +49,6 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
     capacityStats(predictions, Terminal(terminal), arrivalsForDate)
       .flatMap { stats =>
         log.info(s"Got ${stats.size} days of stats for $terminal")
-        val fileWriter = new FileWriter(new File(s"/tmp/pax-forecast-$port-$terminal.csv"))
         val csvContent = stats
           .foldLeft(csvHeader + "\n") {
             case (acc, (date, actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, flightCount)) =>
@@ -59,9 +58,16 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
               val predPaxPerFlight = predPax.toDouble / flightCount
               acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCap%.2f,$predCap%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
           }
-        fileWriter.write(csvContent)
-        fileWriter.close()
-        dumpStats(s"analytics/passenger-forecast/$port-$terminal.csv", csvContent)
+        val fileName = s"$port-$terminal.csv"
+
+        Future
+          .sequence(predictionWriters.map(_(fileName, csvContent)))
+          .map(_ => Done)
+          .recoverWith {
+            case t =>
+              log.error(s"Failed to dump stats for $terminal", t)
+              Future.successful(Done)
+          }
       }
   }
 

@@ -29,15 +29,26 @@ object AnalyticsApp extends App {
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   private val portCode = PortCode(config.getString("port-code").toUpperCase)
+  private val jobTimeout = config.getInt("options.job-timeout-minutes").minutes
 
-  private val maybeWritePredictions: Try[(String, String) => Future[Done]] = for {
+  private val tryWriteToS3: Try[(String, String) => Future[Done]] = for {
     accessKeyId <- Try(config.getString("aws.access-key-id"))
     secretAccessKey <- Try(config.getString("aws.secret-access-key"))
     bucketName <- Try(config.getString("aws.s3.bucket"))
+    path <- Try(config.getString("aws.s3.path"))
   } yield {
+    log.info(s"S3 persistence of predictions enabled. Bucket name: $bucketName")
     val client = Utils.s3AsyncClient(accessKeyId, secretAccessKey)
-    Utils.writeToBucket(client, bucketName)
+    Utils.writeToBucket(client, bucketName, path)
   }
+
+  private val writeToFileSystem = Try(config.getString("options.dump-predictions-file-path"))
+    .map { filePath =>
+      log.info(s"Writing predictions to file $filePath")
+      Utils.writeToFile(filePath)
+    }
+
+  val writePredictions = tryWriteToS3.toOption.toList ++ writeToFileSystem.toOption.toList
 
   AirportConfigs.confByPort.get(portCode) match {
     case None =>
@@ -48,11 +59,11 @@ object AnalyticsApp extends App {
     case Some(portConfig) =>
       log.info(s"Looking for job ${config.getString("options.job-name")}")
       val persistence: ModelPersistence = if (config.getBoolean("options.dry-run")) NoOpPersistence else Flight()
-      val executor = JobExecutor(config, portCode, maybeWritePredictions, persistence)
+      val executor = JobExecutor(config, portCode, writePredictions, persistence)
       val jobName = config.getString("options.job-name").toLowerCase
       val eventualUpdates = executor.executeJob(portConfig, jobName)
 
-      Await.ready(eventualUpdates, 60 minutes)
+      Await.ready(eventualUpdates, jobTimeout)
       System.exit(0)
   }
 }
