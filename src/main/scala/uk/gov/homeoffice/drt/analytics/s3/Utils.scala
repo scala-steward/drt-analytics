@@ -28,7 +28,7 @@ object Utils {
     (fileName: String, content: String) => {
       val putObjectRequest = PutObjectRequest.builder()
         .bucket(bucketName)
-        .key(s"$fileName/$path")
+        .key(s"$path/$fileName")
         .build()
 
       val asyncRequestBody = AsyncRequestBody.fromString(content)

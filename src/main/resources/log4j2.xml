@@ -18,6 +18,9 @@
         <Logger name="org.apache.spark" level="warn" additivity="false">
             <AppenderRef ref="Router"/>
         </Logger>
+        <Logger name="breeze.optimize.LBFGS" level="warn" additivity="false">
+            <AppenderRef ref="Router"/>
+        </Logger>
         <Root level="info">
             <AppenderRef ref="Router"/>
         </Root>
