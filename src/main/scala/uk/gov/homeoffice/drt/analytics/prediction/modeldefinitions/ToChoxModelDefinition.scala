@@ -20,6 +20,6 @@ case class ToChoxModelDefinition(defaultTimeToChox: Long) extends ModelDefinitio
     FlightNumber,
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalCarrier.fromArrival
-  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = minutesToChox(features)
+  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = minutesToChox(features)
   override val baselineValue: Terminal => Double = (_: Terminal) => defaultTimeToChox.toDouble
 }

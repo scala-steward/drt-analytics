@@ -19,7 +19,7 @@ import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Futu
 
 class MockFlightsActor(val terminal: Terminal,
                        val date: UtcDate,
-                       val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double])],
+                       val extractValues: Arrival => Option[(Double, Seq[String], Seq[Double], String)],
                        val aggregateKey: Arrival => Option[TerminalFlightNumberOrigin],
                        val preProcessing: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
                       ) extends Actor with TerminalDateActor[Arrival] {
@@ -29,7 +29,7 @@ class MockFlightsActor(val terminal: Terminal,
 }
 
 object MockFlightsActor {
-  var state: Map[TerminalFlightNumberOrigin, Iterable[(Double, Seq[String], Seq[Double])]] = Map()
+  var state: Map[TerminalFlightNumberOrigin, Iterable[(Double, Seq[String], Seq[Double], String)]] = Map()
 }
 
 class TerminalFlightNumberOriginValuesExtractorSpec
@@ -44,29 +44,29 @@ class TerminalFlightNumberOriginValuesExtractorSpec
   }
 
   "TerminalFlightNumberOriginsValuesExtractor" should {
-    val singleFlight = Map(TerminalFlightNumberOrigin("T1", 1, "JFK") -> List((0d, Seq("1", "0"), Seq())))
+    val singleFlight = Map(TerminalFlightNumberOrigin("T1", 1, "JFK") -> List((0d, Seq("1", "0"), Seq(), "")))
     val multiFlights = Map(
-      TerminalFlightNumberOrigin("T1", 1, "JFK") -> List((0d, Seq("1", "0"), Seq()), (5d, Seq("2", "1"), Seq()), (2d, Seq("3", "0"), Seq())),
-      TerminalFlightNumberOrigin("T2", 5555, "ABC") -> List((1d, Seq("6", "1"), Seq())),
+      TerminalFlightNumberOrigin("T1", 1, "JFK") -> List((0d, Seq("1", "0"), Seq(), ""), (5d, Seq("2", "1"), Seq(), ""), (2d, Seq("3", "0"), Seq(), "")),
+      TerminalFlightNumberOrigin("T2", 5555, "ABC") -> List((1d, Seq("6", "1"), Seq(), "")),
     )
 
     "return a source of (TerminalFlightNumberOrigin, extracted values) for a single flight on a route" in {
       val extractor = ValuesExtractor(
         classOf[MockFlightsActor],
-        (_: Arrival) => Some((0L, Seq("1", "0"), Seq())), TerminalFlightNumberOrigin.fromArrival,
+        (_: Arrival) => Some((0L, Seq("1", "0"), Seq(), "")), TerminalFlightNumberOrigin.fromArrival,
         (_, a) => Future.successful(a)
       )
       MockFlightsActor.state = singleFlight
 
       val result = Await.result(extractor.extractValuesByKey(T1, SDate("2023-01-01T00:00"), 1).runWith(Sink.seq), 1.second)
 
-      assert(result === Seq((TerminalFlightNumberOrigin("T1", 1, "JFK"), List((0d, List("1", "0"), List())))))
+      assert(result === Seq((TerminalFlightNumberOrigin("T1", 1, "JFK"), List((0d, List("1", "0"), List(), "")))))
     }
 
     "return a source of (TerminalFlightNumberOrigin, extracted values) for a multiple flights on a multiple routes" in {
       val extractor = ValuesExtractor(
         classOf[MockFlightsActor],
-        (_: Arrival) => Some((0L, Seq("1", "0"), Seq())), TerminalFlightNumberOrigin.fromArrival,
+        (_: Arrival) => Some((0L, Seq("1", "0"), Seq(), "")), TerminalFlightNumberOrigin.fromArrival,
         (_, a) => Future.successful(a)
       )
       MockFlightsActor.state = multiFlights
@@ -75,12 +75,12 @@ class TerminalFlightNumberOriginValuesExtractorSpec
 
       assert(result === Seq((
         TerminalFlightNumberOrigin("T1", 1, "JFK"), List(
-        (0d, List("1", "0"), List()),
-        (5d, List("2", "1"), List()),
-        (2d, List("3", "0"), List()),
+        (0d, List("1", "0"), List(), ""),
+        (5d, List("2", "1"), List(), ""),
+        (2d, List("3", "0"), List(), ""),
       )), (
         TerminalFlightNumberOrigin("T2", 5555, "ABC"), List(
-        (1d, List("6", "1"), List()),
+        (1d, List("6", "1"), List(), ""),
       )),
       ))
     }

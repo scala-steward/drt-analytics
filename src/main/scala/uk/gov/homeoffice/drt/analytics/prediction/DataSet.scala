@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
-import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id}
+import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id, rand}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
@@ -29,7 +29,6 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
   def trainModel(labelCol: String, trainingSplitPercentage: Int)
                 (implicit session: SparkSession): LinearRegressionModel =
     new LinearRegression()
-      .setRegParam(1)
       .fit(prepareDataFrame(labelCol, trainingSplitPercentage, sortAscending = true))
 
   def evaluate(labelCol: String, trainingSplitPercentage: Int, model: LinearRegressionModel)
@@ -50,11 +49,8 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
 
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 
-    val sortBy = if (sortAscending) $"_index".asc else $"_index".desc
-
     dfIndexed
       .select(labelAndFeatures: _*)
-      .sort(sortBy)
       .limit(partitionIndexValue)
       .collect.toSeq
       .map { row =>
@@ -73,4 +69,6 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
       }
       .toDF("label", "features", "index")
   }
+
+  def shuffle(): DataSet = copy(df = dfIndexed.sort(rand))
 }

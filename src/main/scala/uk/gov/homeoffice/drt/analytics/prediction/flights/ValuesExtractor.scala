@@ -19,9 +19,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 
 case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](actorClass: Class[T],
-                                                                             extractValues: _ => Option[(Double, Seq[String], Seq[Double])],
+                                                                             extractValues: _ => Option[(Double, Seq[String], Seq[Double], String)],
                                                                              extractKey: M => Option[WithId],
-                                                                             preProcess: (UtcDate, Map[ArrivalKey, Arrival]) => Future[Map[ArrivalKey, Arrival]],
+                                                                             preProcess: (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]],
                                                                             )
                                                                             (implicit system: ActorSystem,
                                                                              ec: ExecutionContext,
@@ -29,19 +29,19 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
                                                                             ) {
   private val log = LoggerFactory.getLogger(getClass)
 
-  val extractValuesByKey: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String], Seq[Double])]), NotUsed] =
+  val extractValuesByKey: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String], Seq[Double], String)]), NotUsed] =
     (terminal, startDate, numberOfDays) => {
       Source(((-1 * numberOfDays) until 0).toList)
         .mapAsync(1) { day =>
           extractValuesForDate(terminal, startDate.addDays(day).toUtcDate)
         }
-        .fold(Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]())(accumulate)
+        .fold(Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]())(accumulate)
         .mapConcat(identity)
     }
 
-  private def accumulate(acc: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]],
-                         incoming: Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]],
-                        ): Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]] =
+  private def accumulate(acc: Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]],
+                         incoming: Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]],
+                        ): Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]] =
     incoming.foldLeft(acc) {
       case (acc, (key, examples)) => acc.updated(key, acc.getOrElse(key, Iterable()) ++ examples)
     }
@@ -50,13 +50,13 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
                                   (implicit system: ActorSystem,
                                    ec: ExecutionContext,
                                    timeout: Timeout
-                                  ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]] = {
+                                  ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
     val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
     actor
-      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double])]]]
-      .map { arrivals =>
+      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]]
+      .map { featuresAndValuesForDate =>
         actor ! PoisonPill
-        arrivals
+        featuresAndValuesForDate
       }
       .recoverWith {
         case t: Throwable =>

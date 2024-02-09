@@ -16,11 +16,11 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
   override val modelName: String = PaxCapModelAndFeatures.targetName
 
   override val features: List[Feature[Arrival]] = List(
-    ChristmasDay(),
     Term1a(),
     OctoberHalfTerm(),
     Term1b(),
     ChristmasHoliday(),
+    ChristmasDay(),
     Term2a(),
     SpringHalfTerm(),
     Term2b(),
@@ -34,10 +34,9 @@ object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
     Carrier,
     Origin,
     FlightNumber,
-    PostPandemicRecovery(SDate("2022-06-01T00:00:00Z")),
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalId.fromArrival
-  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = percentCapacity(features)
+  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = percentCapacity(features)
   override val baselineValue: Terminal => Double = (_: Terminal) => 0d
 }
 

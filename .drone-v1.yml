@@ -143,11 +143,10 @@ steps:
       SLACK_WEBHOOK:
         from_secret: slack_webhook
     when:
-      event:
-        - push
+      status: [ success, failure ]
+      event: push
     depends_on:
       - Unit tests
-      - Publish app
 
 services:
   - name: NVD mirror service

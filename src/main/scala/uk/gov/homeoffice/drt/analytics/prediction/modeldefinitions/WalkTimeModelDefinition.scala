@@ -27,6 +27,6 @@ case class WalkTimeModelDefinition(maybeGatesPath: Option[String],
     FlightNumber,
   )
   override val aggregateValue: Arrival => Option[WithId] = TerminalCarrier.fromArrival
-  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double])] = walkTimeMinutes(provider)(features)
+  override val targetValueAndFeatures: Arrival => Option[(Double, Seq[String], Seq[Double], String)] = walkTimeMinutes(provider)(features)
   override val baselineValue: Terminal => Double = (t: Terminal) => defaultWalkTimeMillis.get(t).map(_.toDouble / 1000).getOrElse(0)
 }

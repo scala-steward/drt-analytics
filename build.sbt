@@ -4,27 +4,26 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v728"
+lazy val drtLib = "v745"
 
 lazy val akkaHttpVersion = "10.5.3"
 lazy val akkaVersion = "2.8.5"
 lazy val akkaPersistenceJdbcVersion = "5.2.0"
 lazy val postgresVersion = "42.7.0"
 lazy val jodaTimeVersion = "2.12.5"
-lazy val logbackContribVersion = "0.1.5"
 lazy val jacksonDatabindVersion = "2.15.3"
 lazy val specs2Version = "4.20.3"
 lazy val sparkVersion = "3.5.0"
 lazy val scalaTestVersion = "3.2.17"
 lazy val catsVersion = "2.10.0"
 lazy val awsJava2SdkVersion = "2.13.76"
-lazy val sslConfigCore = "0.6.1"
+lazy val sslConfigCoreVersion = "0.6.1"
 lazy val scalaXmlVersion = "2.2.0"
+lazy val log4jLayoutTemplateJsonVersion = "2.22.1"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-  "ch.qos.logback.contrib" % "logback-json-classic" % logbackContribVersion,
-  "ch.qos.logback.contrib" % "logback-jackson" % logbackContribVersion,
+  "org.apache.logging.log4j" % "log4j-layout-template-json" % log4jLayoutTemplateJsonVersion,
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
@@ -46,7 +45,7 @@ libraryDependencies ++= Seq(
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
-  "com.typesafe" %% "ssl-config-core" % sslConfigCore,
+  "com.typesafe" %% "ssl-config-core" % sslConfigCoreVersion,
 )
 
 lazy val root = (project in file("."))
