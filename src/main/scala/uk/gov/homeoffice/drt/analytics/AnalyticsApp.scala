@@ -64,6 +64,7 @@ object AnalyticsApp extends App {
       val eventualUpdates = executor.executeJob(portConfig, jobName)
 
       Await.ready(eventualUpdates, jobTimeout)
+      system.terminate()
       System.exit(0)
   }
 }
