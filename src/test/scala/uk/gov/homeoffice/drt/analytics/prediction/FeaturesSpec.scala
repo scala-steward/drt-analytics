@@ -6,7 +6,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Carrier, DayOfWeek}
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{Carrier, DayOfWeek}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 class FeaturesSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {

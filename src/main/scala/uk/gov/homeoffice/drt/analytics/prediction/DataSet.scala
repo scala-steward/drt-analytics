@@ -2,10 +2,10 @@ package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
 import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id, rand}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Feature, OneToMany, Single}
+import uk.gov.homeoffice.drt.prediction.arrival.features.{Feature, OneToManyFeature, SingleFeature}
 
 import scala.util.Try
 
@@ -16,8 +16,8 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
 
   val numRows: Long = dfIndexed.count()
   val oneToManyFeatureValues: IndexedSeq[String] = features.flatMap {
-    case _: Single[_] => Iterable()
-    case feature: OneToMany[_] =>
+    case _: SingleFeature[_] => Iterable()
+    case feature: OneToManyFeature[_] =>
       df
         .select(concat_ws("-", col(feature.label)))
         .rdd.distinct.collect

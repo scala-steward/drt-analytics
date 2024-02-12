@@ -11,7 +11,7 @@ import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.actors.Ack
 import uk.gov.homeoffice.drt.analytics.prediction.dump.NoOpDump
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, PartOfDay}
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
 import uk.gov.homeoffice.drt.prediction.{ActorModelPersistence, ModelCategory}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
@@ -78,17 +78,18 @@ class FlightRouteValuesTrainerSpec
   private def getTrainer(examples: Iterable[(Double, Seq[String], Seq[Double], String)], probe: ActorRef): FlightRouteValuesTrainer = {
     implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
     FlightRouteValuesTrainer(
-      "some-model",
-      List(DayOfWeek(), PartOfDay()),
-      (_: Terminal, _: SDateLike, _: Int) => {
+      modelName = "some-model",
+      featuresVersion = 1,
+      features = List(DayOfWeek(), PartOfDay()),
+      examplesProvider = (_: Terminal, _: SDateLike, _: Int) => {
         Source(List((TerminalFlightNumberOrigin("T2", 1, "JFK"), examples)))
       },
-      _ => 1000d,
-      10,
-      0.1,
-      0.9,
-      MockPersistence(probe),
-      NoOpDump
+      baselineValue = _ => 1000d,
+      daysOfTrainingData = 10,
+      lowerQuantile = 0.1,
+      upperQuantile = 0.9,
+      persistence = MockPersistence(probe),
+      dumper = NoOpDump
     )
   }
 }

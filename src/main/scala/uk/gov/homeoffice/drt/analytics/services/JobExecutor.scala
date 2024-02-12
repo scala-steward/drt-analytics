@@ -5,7 +5,6 @@ import akka.actor.ActorSystem
 import akka.util.Timeout
 import com.typesafe.config.Config
 import org.slf4j.{Logger, LoggerFactory}
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.analytics.prediction.dump.{ModelPredictionsDump, NoOpDump, PaxPredictionDump}
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{ArrivalsProvider, FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, PaxCapModelDefinition, ToChoxModelDefinition, WalkTimeModelDefinition}
@@ -19,7 +18,6 @@ import uk.gov.homeoffice.drt.time.UtcDate
 
 import java.nio.file.{Files, Paths}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 case class JobExecutor(config: Config,
                        portCode: PortCode,
@@ -89,6 +87,7 @@ case class JobExecutor(config: Config,
 
     val trainer = FlightRouteValuesTrainer(
       modelName = modDef.modelName,
+      featuresVersion = modDef.featuresVersion,
       features = modDef.features,
       examplesProvider = examplesProvider,
       baselineValue = modDef.baselineValue,

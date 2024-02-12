@@ -5,15 +5,18 @@ import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.percentCapacity
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns._
-import uk.gov.homeoffice.drt.prediction.arrival.PaxCapModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.arrival.PaxCapModelAndFeaturesV2
+import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV2._
 import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike}
 
 object PaxCapModelDefinition extends ModelDefinition[Arrival, Terminal] {
   implicit val sdateTs: Long => SDateLike = (ts: Long) => SDate(ts)
   implicit val sdateLocal: LocalDate => SDateLike = (ts: LocalDate) => SDate(ts)
 
-  override val modelName: String = PaxCapModelAndFeatures.targetName
+  override val modelName: String = PaxCapModelAndFeaturesV2.targetName
+
+  override val featuresVersion = PaxCapModelAndFeaturesV2.featuresVersion
 
   override val features: List[Feature[Arrival]] = List(
     Term1a(),
