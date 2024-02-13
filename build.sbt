@@ -20,13 +20,16 @@ lazy val awsJava2SdkVersion = "2.13.76"
 lazy val sslConfigCoreVersion = "0.6.1"
 lazy val scalaXmlVersion = "2.2.0"
 lazy val log4jLayoutTemplateJsonVersion = "2.22.1"
+lazy val logbackClassicVersion = "1.4.14"
+lazy val logbackJsonClassicVersion = "0.1.5"
+lazy val logbackJacksonVersion = "0.1.5"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
 
-  "ch.qos.logback" % "logback-classic" % "1.3.5",
-  "ch.qos.logback.contrib" % "logback-json-classic" % "0.1.5",
-  "ch.qos.logback.contrib" % "logback-jackson" % "0.1.5",
+  "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
+  "ch.qos.logback.contrib" % "logback-json-classic" % logbackJsonClassicVersion,
+  "ch.qos.logback.contrib" % "logback-jackson" % logbackJacksonVersion,
 
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
