@@ -49,23 +49,29 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
     capacityStats(predictions, Terminal(terminal), arrivalsForDate)
       .flatMap { stats =>
         log.info(s"Got ${stats.size} days of stats for $terminal")
-        val (csvContent, predDiffs, fcstDiffs) = stats
-          .foldLeft((csvHeader + "\n", Seq.empty[Int], Seq.empty[Int])) {
-            case ((accRow, accPredDiffs, accFcstDiffs), (date, actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, flightCount, predPaxDiffs, fcstPaxDiffs)) =>
+        val (csvContent, predDiffs, fcstDiffs, dailyPredMae, dailyFcstMae) = stats
+          .foldLeft((csvHeader + "\n", Seq.empty[Int], Seq.empty[Int], Seq.empty[Double], Seq.empty[Double])) {
+            case ((accRow, accPredDiffs, accFcstDiffs, dailyPredMae, dailyFcstMae), (date, actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, flightCount, predPaxDiffs, fcstPaxDiffs)) =>
               val predDiff = (predPax - actPax).toDouble / actPax * 100
               val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
               val actPaxPerFlight = actPax.toDouble / flightCount
               val predPaxPerFlight = predPax.toDouble / flightCount
               val row = f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCap%.2f,$predCap%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
-              (accRow + row, accPredDiffs ++ predPaxDiffs, accFcstDiffs ++ fcstPaxDiffs)
+              (accRow + row, accPredDiffs ++ predPaxDiffs, accFcstDiffs ++ fcstPaxDiffs, dailyPredMae :+ Math.abs(predDiff), dailyFcstMae :+ Math.abs(fcstDiff))
           }
-        val (maePred, rmsePred, medianPred) = calcStats(predDiffs)
-        val (maeFcst, rmseFcst, medianFcst) = calcStats(fcstDiffs)
+        val (maePred, rmsePred, medianPred) = calcFlightStats(predDiffs)
+        val (dMae, dRmse, dMedian) = calcDailyStats(dailyPredMae)
+        val (maeFcst, rmseFcst, medianFcst) = calcFlightStats(fcstDiffs)
+        val (fMae, fRmse, fMedian) = calcDailyStats(dailyFcstMae)
+        val predictionStats = f"""Prediction,$maePred%.2f,$rmsePred%.2f,$medianPred%.2f,$dMae%.2f,$dRmse%.2f,$dMedian%.2f"""
+        val forecastStats = f"""Forecast,$maeFcst%.2f,$rmseFcst%.2f,$medianFcst%.2f,$fMae%.2f,$fRmse%.2f,$fMedian%.2f"""
+        log.info(s"Prediction stats for $terminal: $predictionStats")
+        log.info(s"Forecast stats for $terminal: $forecastStats")
         val statistics =
           f"""
-             |,MAE,RMSE,Median error
-             |Prediction,$maePred%.2f,$rmsePred%.2f,$medianPred%.2f
-             |Forecast,$maeFcst%.2f,$rmseFcst%.2f,$medianFcst%.2f
+             |,Flight MAE,Flight RMSE,Flight Median error,Daily MAE,Daily RMSE,Daily Median error
+             |$predictionStats
+             |$forecastStats
              |""".stripMargin
         val contentWithErrorStats = csvContent + statistics
         val fileName = s"$port-$terminal.csv"
@@ -81,7 +87,15 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
       }
   }
 
-  private def calcStats(seq: Seq[Int]): (Double, Double, Double) = {
+  private def calcDailyStats(seq: Seq[Double]): (Double, Double, Double) = {
+    val count = seq.size
+    val mae = seq.map(Math.abs).sum / count
+    val rmse = Math.sqrt(seq.map(score => score * score).sum / count)
+    val median = getMedian[Double, Double](seq)
+    (mae, rmse, median)
+  }
+
+  private def calcFlightStats(seq: Seq[Int]): (Double, Double, Double) = {
     val count = seq.size
     val mae = seq.map(Math.abs).sum.toDouble / count
     val rmse = Math.sqrt(seq.map(score => score * score).sum / count)
