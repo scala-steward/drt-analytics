@@ -4,7 +4,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Carrier, DayOfWeek, Feature}
+import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{Carrier, DayOfWeek}
 import uk.gov.homeoffice.drt.time.SDate
 
 class BasicLearningSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {

@@ -6,7 +6,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{BestPax, Carrier}
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{BestPax, Carrier}
 
 class FeatureVectorsSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {
   implicit val session: SparkSession = SparkSession

@@ -14,8 +14,8 @@ object NoOpPersistence extends ModelPersistence {
   override def getModels(validModelNames: Seq[String]): PredictionModelActor.WithId => Future[PredictionModelActor.Models] =
     _ => Future.successful(PredictionModelActor.Models(Map()))
 
-  override val persist: (PredictionModelActor.WithId, LinearRegressionModel, FeaturesWithOneToManyValues, Int, Double, String) => Future[Done] =
-    (_, _, _, _, _, _) => {
+  override val persist: (PredictionModelActor.WithId, Int, LinearRegressionModel, FeaturesWithOneToManyValues, Int, Double, String) => Future[Done] =
+    (_, _, _, _, _, _, _) => {
       log.info(s"NoOpPersistence: not persisting model")
       Future.successful(Done)
     }

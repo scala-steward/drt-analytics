@@ -5,14 +5,16 @@ import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.minutesToChox
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{DayOfWeek, Feature, FlightNumber, Origin, PartOfDay}
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{DayOfWeek, FlightNumber, Origin, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.arrival.ToChoxModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 case class ToChoxModelDefinition(defaultTimeToChox: Long) extends ModelDefinition[Arrival, Terminal] {
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   override val modelName: String = ToChoxModelAndFeatures.targetName
+  override val featuresVersion = ToChoxModelAndFeatures.featuresVersion
   override val features: List[Feature[Arrival]] = List(
     DayOfWeek(),
     PartOfDay(),

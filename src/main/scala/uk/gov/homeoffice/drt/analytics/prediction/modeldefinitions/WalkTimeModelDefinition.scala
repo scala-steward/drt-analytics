@@ -6,8 +6,9 @@ import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.walkTimeMinutes
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns._
 import uk.gov.homeoffice.drt.prediction.arrival.WalkTimeModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1._
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 
@@ -20,6 +21,7 @@ case class WalkTimeModelDefinition(maybeGatesPath: Option[String],
   private val provider = WalkTimeProvider(maybeGatesPath, maybeStandsPath)
 
   override val modelName: String = WalkTimeModelAndFeatures.targetName
+  override val featuresVersion = WalkTimeModelAndFeatures.featuresVersion
   override val features: List[Feature[Arrival]] = List(
     DayOfWeek(),
     PartOfDay(),

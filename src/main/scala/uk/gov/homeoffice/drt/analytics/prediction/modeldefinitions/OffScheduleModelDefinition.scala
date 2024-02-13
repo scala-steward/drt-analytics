@@ -5,14 +5,16 @@ import uk.gov.homeoffice.drt.analytics.prediction.ModelDefinition
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.prediction.arrival.ArrivalFeatureValuesExtractor.minutesOffSchedule
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.{Carrier, DayOfWeek, Feature, FlightNumber, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.arrival.OffScheduleModelAndFeatures
+import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
+import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{Carrier, DayOfWeek, FlightNumber, PartOfDay}
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 object OffScheduleModelDefinition extends ModelDefinition[Arrival, Terminal] {
   implicit val sdateProvider: Long => SDateLike = (ts: Long) => SDate(ts)
 
   override val modelName: String = OffScheduleModelAndFeatures.targetName
+  override val featuresVersion = OffScheduleModelAndFeatures.featuresVersion
   override val features: List[Feature[Arrival]] = List(
     DayOfWeek(),
     PartOfDay(),

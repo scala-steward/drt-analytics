@@ -5,7 +5,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, Row}
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Single
+import uk.gov.homeoffice.drt.prediction.arrival.features.SingleFeature
 
 import scala.collection.immutable
 import scala.util.{Failure, Success, Try}
@@ -25,7 +25,7 @@ object FeatureVectors {
   }
 
   def singleFeaturesVector(row: Row, features: FeaturesWithOneToManyValues): List[Double] = features.features.collect {
-    case feature: Single[_] => row.getAs[Double](feature.label)
+    case feature: SingleFeature[_] => row.getAs[Double](feature.label)
   }
 
   def oneToManyIndices(row: Row, features: FeaturesWithOneToManyValues): Seq[(Int, Double)] =

@@ -14,7 +14,7 @@ import uk.gov.homeoffice.drt.analytics.prediction.dump.ModelPredictionsDump
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports._
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
-import uk.gov.homeoffice.drt.prediction.arrival.FeatureColumns.Feature
+import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
 import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,6 +25,7 @@ object FlightRouteValuesTrainer {
 }
 
 case class FlightRouteValuesTrainer(modelName: String,
+                                    featuresVersion: Int,
                                     features: List[Feature[_]],
                                     examplesProvider: ModelExamplesProvider[WithId],
                                     baselineValue: Terminal => Double,
@@ -100,7 +101,7 @@ case class FlightRouteValuesTrainer(modelName: String,
               val lrModel: LinearRegressionModel = dataSet.trainModel("label", trainingSetPct)
               val improvementPct = calculateImprovementPct(dataSet, allExamples, lrModel, validationSetPct, baselineValue(terminal))
               for {
-                _ <- persistence.persist(modelIdentifier, lrModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
+                _ <- persistence.persist(modelIdentifier, featuresVersion, lrModel, dataSet.featuresWithOneToManyValues, trainingExamples, improvementPct, modelName)
                 _ <- dumper.dumpDailyStats(dataSet, allExamples, lrModel, portCode, terminal.toString).map(_ => Option(improvementPct))
               } yield Option(improvementPct)
           }

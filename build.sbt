@@ -4,7 +4,7 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v745"
+lazy val drtLib = "v749"
 
 lazy val akkaHttpVersion = "10.5.3"
 lazy val akkaVersion = "2.8.5"
@@ -23,7 +23,11 @@ lazy val log4jLayoutTemplateJsonVersion = "2.22.1"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-  "org.apache.logging.log4j" % "log4j-layout-template-json" % log4jLayoutTemplateJsonVersion,
+
+  "ch.qos.logback" % "logback-classic" % "1.3.5",
+  "ch.qos.logback.contrib" % "logback-json-classic" % "0.1.5",
+  "ch.qos.logback.contrib" % "logback-jackson" % "0.1.5",
+
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
