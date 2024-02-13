@@ -34,7 +34,7 @@
         <appender-ref ref="ASYNC"/>
     </root>
 
-    <logger level="WARN" name="org.apache.commons.vfs2">
+    <logger level="WARN" name="org.apache.spark">
         <appender-ref ref="ASYNC"/>
     </logger>
 
@@ -43,10 +43,6 @@
     </logger>
 
     <logger name="slick.jdbc.JdbcBackend.statement" level="${SLICK_DEBUG_LEVEL:-WARN}">
-        <appender-ref ref="ASYNC"/>
-    </logger>
-
-    <logger name="net.schmizz.sshj" level="INFO">
         <appender-ref ref="ASYNC"/>
     </logger>
 </configuration>
