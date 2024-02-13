@@ -66,8 +66,8 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
              |MAE forecast error,$maeFcst%.2f
              |RMSE prediction error,$rmsePred%.2f
              |RMSE forecast error,$rmseFcst%.2f
-             |Median prediction error,$medianPred
-             |Median forecast error,$medianFcst
+             |Median prediction error,$medianPred%.2f
+             |Median forecast error,$medianFcst%.2f
              |""".stripMargin
         val contentWithErrorStats = csvContent + statistics
         val fileName = s"$port-$terminal.csv"
@@ -83,12 +83,23 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
       }
   }
 
-  private def calcStats(seq: Seq[Int]): (Double, Double, Int) = {
+  private def calcStats(seq: Seq[Int]): (Double, Double, Double) = {
     val count = seq.size
     val mae = seq.map(Math.abs).sum.toDouble / count
     val rmse = Math.sqrt(seq.map(score => score * score).sum / count)
-    val median = seq.toIndexedSeq.sorted.apply(count / 2)
+    val median = getMedian[Int, Double](seq)
     (mae, rmse, median)
+  }
+
+  private def getMedian[T: Ordering, F]
+  (seq: Seq[T])
+  (implicit conv: T => F, f: Fractional[F]): F = {
+    val sortedSeq = seq.sorted
+    if (seq.size % 2 == 1) sortedSeq(sortedSeq.size / 2) else {
+      val (up, down) = sortedSeq.splitAt(seq.size / 2)
+      import f._
+      (conv(up.last) + conv(down.head)) / fromInt(2)
+    }
   }
 
   private def predictionsWithLabels(dataSet: DataSet,
