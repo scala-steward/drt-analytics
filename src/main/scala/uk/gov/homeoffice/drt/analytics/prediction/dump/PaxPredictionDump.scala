@@ -62,12 +62,10 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
         val (maePred, rmsePred, medianPred) = calcStats(predDiffs)
         val (maeFcst, rmseFcst, medianFcst) = calcStats(fcstDiffs)
         val statistics =
-          f"""MAE prediction error,$maePred%.2f
-             |MAE forecast error,$maeFcst%.2f
-             |RMSE prediction error,$rmsePred%.2f
-             |RMSE forecast error,$rmseFcst%.2f
-             |Median prediction error,$medianPred%.2f
-             |Median forecast error,$medianFcst%.2f
+          f"""
+             |,MAE,RMSE,Median error
+             |Prediction,$maePred%.2f,$rmsePred%.2f,$medianPred%.2f
+             |Forecast,$maeFcst%.2f,$rmseFcst%.2f,$medianFcst%.2f
              |""".stripMargin
         val contentWithErrorStats = csvContent + statistics
         val fileName = s"$port-$terminal.csv"
