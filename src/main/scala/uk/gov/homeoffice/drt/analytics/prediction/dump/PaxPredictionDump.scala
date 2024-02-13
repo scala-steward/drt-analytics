@@ -49,19 +49,31 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
     capacityStats(predictions, Terminal(terminal), arrivalsForDate)
       .flatMap { stats =>
         log.info(s"Got ${stats.size} days of stats for $terminal")
-        val csvContent = stats
-          .foldLeft(csvHeader + "\n") {
-            case (acc, (date, actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, flightCount)) =>
+        val (csvContent, predDiffs, fcstDiffs) = stats
+          .foldLeft((csvHeader + "\n", Seq.empty[Int], Seq.empty[Int])) {
+            case ((accRow, accPredDiffs, accFcstDiffs), (date, actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, flightCount, predPaxDiffs, fcstPaxDiffs)) =>
               val predDiff = (predPax - actPax).toDouble / actPax * 100
               val fcstDiff = (fcstPax - actPax).toDouble / actPax * 100
               val actPaxPerFlight = actPax.toDouble / flightCount
               val predPaxPerFlight = predPax.toDouble / flightCount
-              acc + f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCap%.2f,$predCap%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
+              val row = f"${date.toISOString},$terminal,$actPax,$predPax,$flightCount,$actPaxPerFlight%.2f,$predPaxPerFlight%.2f,$actCap%.2f,$predCap%.2f,$predDiff%.2f,$fcstPax,$fcstCapPct%.2f,$fcstDiff\n"
+              (accRow + row, accPredDiffs ++ predPaxDiffs, accFcstDiffs ++ fcstPaxDiffs)
           }
+        val (maePred, rmsePred, medianPred) = calcStats(predDiffs)
+        val (maeFcst, rmseFcst, medianFcst) = calcStats(fcstDiffs)
+        val statistics =
+          f"""MAE prediction error,$maePred%.2f
+             |MAE forecast error,$maeFcst%.2f
+             |RMSE prediction error,$rmsePred%.2f
+             |RMSE forecast error,$rmseFcst%.2f
+             |Median prediction error,$medianPred
+             |Median forecast error,$medianFcst
+             |""".stripMargin
+        val contentWithErrorStats = csvContent + statistics
         val fileName = s"$port-$terminal.csv"
 
         Future
-          .sequence(predictionWriters.map(_(fileName, csvContent)))
+          .sequence(predictionWriters.map(_(fileName, contentWithErrorStats)))
           .map(_ => Done)
           .recoverWith {
             case t =>
@@ -69,6 +81,14 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
               Future.successful(Done)
           }
       }
+  }
+
+  private def calcStats(seq: Seq[Int]): (Double, Double, Int) = {
+    val count = seq.size
+    val mae = seq.map(Math.abs).sum.toDouble / count
+    val rmse = Math.sqrt(seq.map(score => score * score).sum / count)
+    val median = seq.toIndexedSeq.sorted.apply(count / 2)
+    (mae, rmse, median)
   }
 
   private def predictionsWithLabels(dataSet: DataSet,
@@ -108,12 +128,12 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
   private def capacityStats(predictionsWithLabels: Map[LocalDate, Array[(Double, Double, String)]],
                             terminal: Terminal,
                             arrivalsForDate: (Terminal, LocalDate) => Future[Seq[Arrival]],
-                           ): Future[Seq[(LocalDate, Int, Int, Int, Double, Double, Double, Int)]] =
+                           ): Future[Seq[(LocalDate, Int, Int, Int, Double, Double, Double, Int, Seq[Int], Seq[Int])]] =
     Source(predictionsWithLabels)
       .mapAsync(1) {
-        case (date, paxCounts) =>
-          val actualCapOrig = paxCounts.map(_._1).sum
-          val flightCount = paxCounts.length
+        case (date, paxCountsForDate) =>
+          val actualCapOrig = paxCountsForDate.map(_._1).sum
+          val flightCount = paxCountsForDate.length
 
           arrivalsForDate(terminal, date)
             .recoverWith {
@@ -122,13 +142,13 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
                 Future.successful(Seq())
             }
             .map { arrivals =>
-              val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = statsForArrivals(paxCounts, arrivals)
+              val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, predPaxDiffs, fcstPaxDiffs) = statsForArrivals(paxCountsForDate, arrivals)
 
               if (Math.abs(actualCapOrig - actCapPct) > actualCapOrig * 0.1) {
                 log.warn(s"Actual cap changed by more than 10% from $actualCapOrig to $actCapPct for $date")
               }
 
-              (date, actPax, predPax, fcstPax, actCapPct / flightCount, predCapPct / flightCount, fcstCapPct / flightCount, flightCount)
+              (date, actPax, predPax, fcstPax, actCapPct / flightCount, predCapPct / flightCount, fcstCapPct / flightCount, flightCount, predPaxDiffs, fcstPaxDiffs)
             }
       }
       .runWith(Sink.seq)
@@ -139,8 +159,8 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
       }
       .map(_.sortBy(_._1))
 
-  private def statsForArrivals(paxCounts: Array[(Double, Double, String)], arrivals: Seq[Arrival]): (Int, Int, Int, Double, Double, Double) = {
-    val maybeArrivalStats: Array[(Int, Int, Int, Double, Double, Double)] = for {
+  private def statsForArrivals(paxCounts: Array[(Double, Double, String)], arrivals: Seq[Arrival]): (Int, Int, Int, Double, Double, Double, Seq[Int], Seq[Int]) = {
+    val maybeArrivalStats: Array[(Int, Int, Int, Double, Double, Double, Int, Int)] = for {
       (_, predCap, keyStr) <- paxCounts
       arrival <- arrivals.find { a =>
         a.unique.stringValue == keyStr && !a.isCancelled
@@ -148,21 +168,23 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
       maxPax <- arrival.MaxPax.filter(_ > 0)
       actualPax <- arrival.bestPcpPaxEstimate(Seq(LiveFeedSource, ApiFeedSource))
     } yield {
-      val predPax = predCap * maxPax / 100
+      val predPax = (predCap * maxPax / 100).round.toInt
       val actualCapPct = 100 * actualPax.toDouble / maxPax match {
         case cap if cap > 100 => 100
         case cap => cap
       }
       val forecastPax = arrival.bestPaxEstimate(Seq(ForecastFeedSource, HistoricApiFeedSource, AclFeedSource)).passengers.getPcpPax.getOrElse(0)
       val forecastCapPct = 100 * forecastPax.toDouble / maxPax
-      (actualPax, predPax.round.toInt, forecastPax, actualCapPct, predCap, forecastCapPct)
+      val predPaxDiff = predPax - actualPax
+      val forecastPaxDiff = forecastPax - actualPax
+      (actualPax, predPax, forecastPax, actualCapPct, predCap, forecastCapPct, predPaxDiff, forecastPaxDiff)
     }
 
-    val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct) = maybeArrivalStats
-      .foldLeft((0, 0, 0, 0d, 0d, 0d)) {
-        case ((actPax, predPax, fcstPax, actCap, predCap, fcstCapPct), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1)) =>
-          (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCap + actCapPct1, predCap + predCapPct1, fcstCapPct + fcstCapPct1)
+    val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, predPaxDiffs, fcstPaxDiffs) = maybeArrivalStats
+      .foldLeft((0, 0, 0, 0d, 0d, 0d, Seq.empty[Int], Seq.empty[Int])) {
+        case ((actPax, predPax, fcstPax, actCap, predCap, fcstCapPct, predPaxDiffs, fcstPaxDiffs), (actPax1, predPax1, fcstPax1, actCapPct1, predCapPct1, fcstCapPct1, predPaxDiffs1, fcstPaxDiffs1)) =>
+          (actPax + actPax1, predPax + predPax1, fcstPax + fcstPax1, actCap + actCapPct1, predCap + predCapPct1, fcstCapPct + fcstCapPct1, predPaxDiffs :+ predPaxDiffs1, fcstPaxDiffs :+ fcstPaxDiffs1)
       }
-    (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct)
+    (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, predPaxDiffs, fcstPaxDiffs)
   }
 }
