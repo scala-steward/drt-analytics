@@ -35,10 +35,10 @@ trait FlightActorLike {
     flightWithSplitsFromMessage(u).apiFlight
 
   def processUpdatesAndRemovals[A <: Updatable[A]](createdAt: Long,
-                                                updates: Iterable[A],
-                                                removals: Iterable[UniqueArrivalMessage],
-                                                deserialiseUpdate: A => Arrival,
-                                  ): Unit = {
+                                                   updates: Iterable[A],
+                                                   removals: Iterable[UniqueArrivalMessage],
+                                                   deserialiseUpdate: A => Arrival,
+                                                  ): Unit = {
     (maybePointInTime, createdAt) match {
       case (Some(time), createdAt) if createdAt > time =>
       case (_, createdAt) =>
