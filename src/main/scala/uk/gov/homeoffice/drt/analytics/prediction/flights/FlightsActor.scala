@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
-import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, FlightsWithSplits}
+import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, FlightsWithSplits, Updatable}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage, SplitsForArrivalsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FlightsDiffMessage, UniqueArrivalMessage}
@@ -34,17 +34,20 @@ trait FlightActorLike {
   def deserialiseFwsMsg(u: FlightWithSplitsMessage): Arrival =
     flightWithSplitsFromMessage(u).apiFlight
 
-  def processUpdatesAndRemovals[A](createdAt: Long,
-                                   updates: Iterable[A],
-                                   removals: Iterable[UniqueArrivalMessage],
-                                   deserialiseUpdate: A => Arrival,
+  def processUpdatesAndRemovals[A <: Updatable[A]](createdAt: Long,
+                                                updates: Iterable[A],
+                                                removals: Iterable[UniqueArrivalMessage],
+                                                deserialiseUpdate: A => Arrival,
                                   ): Unit = {
     (maybePointInTime, createdAt) match {
       case (Some(time), createdAt) if createdAt > time =>
       case (_, createdAt) =>
         updates
           .map(deserialiseUpdate)
-          .foreach(arrival => byArrivalKey = byArrivalKey.updated(ArrivalKey(arrival), arrival))
+          .foreach { arrival =>
+            val updatedArrival = byArrivalKey.get(ArrivalKey(arrival)).map(_.update(arrival)).getOrElse(arrival)
+            byArrivalKey = byArrivalKey.updated(ArrivalKey(arrival), updatedArrival)
+          }
 
         if (SDate(createdAt) < SDate(date).addHours(28)) {
           if (removals.size < byArrivalKey.size)
