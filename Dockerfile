@@ -22,6 +22,15 @@ RUN chown 1001:1001 -R /var/data
 RUN mkdir -p /var/data/logs
 RUN chown 1001:1001 -R /var/data/logs
 
+RUN apt-get update
+RUN apt-get install -y openssh-client ca-certificates wget
+
+RUN mkdir -p /etc/drt
+RUN wget https://truststore.pki.rds.amazonaws.com/eu-west-2/eu-west-2-bundle.pem -O /etc/drt/eu-west-2-bundle.pem
+RUN openssl x509 -outform der -in /etc/drt/eu-west-2-bundle.pem -out /etc/drt/certificate.der
+
+RUN keytool -noprompt -storepass changeit -import -alias rds-root -keystore $JAVA_HOME/lib/security/cacerts -file /etc/drt/certificate.der
+
 USER 1001:0
 ENTRYPOINT ["/opt/docker/bin/drt-analytics"]
 CMD []
