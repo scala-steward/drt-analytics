@@ -23,7 +23,7 @@ RUN mkdir -p /var/data/logs
 RUN chown 1001:1001 -R /var/data/logs
 
 RUN apt-get update
-RUN apt-get install -y openssh-client ca-certificates curl
+RUN apt-get install -y curl
 
 RUN mkdir /home/drt/.postgresql
 RUN curl https://truststore.pki.rds.amazonaws.com/eu-west-2/eu-west-2-bundle.pem > /home/drt/.postgresql/root.crt
