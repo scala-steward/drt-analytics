@@ -25,11 +25,8 @@ RUN chown 1001:1001 -R /var/data/logs
 RUN apt-get update
 RUN apt-get install -y openssh-client ca-certificates curl
 
-RUN mkdir -p /etc/drt
-RUN curl https://truststore.pki.rds.amazonaws.com/eu-west-2/eu-west-2-bundle.pem > /etc/drt/eu-west-2-bundle.pem
-RUN openssl x509 -outform der -in /etc/drt/eu-west-2-bundle.pem -out /etc/drt/certificate.der
-
-RUN keytool -noprompt -storepass changeit -import -alias rds-root -keystore $JAVA_HOME/lib/security/cacerts -file /etc/drt/certificate.der
+RUN mkdir /home/drt/.postgresql
+RUN curl https://truststore.pki.rds.amazonaws.com/eu-west-2/eu-west-2-bundle.pem > /home/drt/.postgresql/root.crt
 
 USER 1001:0
 ENTRYPOINT ["/opt/docker/bin/drt-analytics"]
