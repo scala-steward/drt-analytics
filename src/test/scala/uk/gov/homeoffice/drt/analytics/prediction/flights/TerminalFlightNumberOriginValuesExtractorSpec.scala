@@ -7,9 +7,9 @@ import akka.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
-import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, Terminal}
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}

@@ -19,7 +19,7 @@ import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Futu
 import scala.language.postfixOps
 import scala.util.Try
 
-object AnalyticsApp extends App {
+object AnalyticsApp {
   private val log: Logger = LoggerFactory.getLogger(getClass)
   val config: Config = ConfigFactory.load()
 
@@ -48,23 +48,25 @@ object AnalyticsApp extends App {
       Utils.writeToFile(filePath)
     }
 
-  val writePredictions = tryWriteToS3.toOption.toList ++ writeToFileSystem.toOption.toList
+  private val writePredictions = tryWriteToS3.toOption.toList ++ writeToFileSystem.toOption.toList
 
-  AirportConfigs.confByPort.get(portCode) match {
-    case None =>
-      log.error(s"Invalid port code '$portCode'")
-      system.terminate()
-      System.exit(0)
+  def main(args: Array[String]): Unit = {
+    AirportConfigs.confByPort.get(portCode) match {
+      case None =>
+        log.error(s"Invalid port code '$portCode'")
+        system.terminate()
+        System.exit(0)
 
-    case Some(portConfig) =>
-      log.info(s"Looking for job ${config.getString("options.job-name")}")
-      val persistence: ModelPersistence = if (config.getBoolean("options.dry-run")) NoOpPersistence else Flight()
-      val executor = JobExecutor(config, portCode, writePredictions, persistence)
-      val jobName = config.getString("options.job-name").toLowerCase
-      val eventualUpdates = executor.executeJob(portConfig, jobName)
+      case Some(portConfig) =>
+        log.info(s"Looking for job ${config.getString("options.job-name")}")
+        val persistence: ModelPersistence = if (config.getBoolean("options.dry-run")) NoOpPersistence else Flight()
+        val executor = JobExecutor(config, portCode, writePredictions, persistence)
+        val jobName = config.getString("options.job-name").toLowerCase
+        val eventualUpdates = executor.executeJob(portConfig, jobName)
 
-      Await.ready(eventualUpdates, jobTimeout)
-      system.terminate()
-      System.exit(0)
+        Await.ready(eventualUpdates, jobTimeout)
+        system.terminate()
+        System.exit(0)
+    }
   }
 }

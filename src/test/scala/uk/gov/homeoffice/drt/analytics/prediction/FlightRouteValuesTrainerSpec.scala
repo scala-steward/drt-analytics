@@ -36,8 +36,8 @@ case class MockPersistence(probe: ActorRef)
                            val system: ActorSystem, val ec: ExecutionContext, val timeout: Timeout
                           ) extends ActorModelPersistence {
   override val modelCategory: ModelCategory = FlightCategory
-  override val actorProvider: (ModelCategory, WithId) => ActorRef =
-    (_, _) => system.actorOf(Props(MockPersistenceActor(probe)), s"test-actor")
+  override val actorProvider: (ModelCategory, WithId, Option[Long]) => ActorRef =
+    (_, _, _) => system.actorOf(Props(MockPersistenceActor(probe)), s"test-actor")
 }
 
 class FlightRouteValuesTrainerSpec

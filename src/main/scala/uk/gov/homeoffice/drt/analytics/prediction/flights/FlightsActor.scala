@@ -2,10 +2,10 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import akka.persistence.{PersistentActor, Recovery, SnapshotOffer, SnapshotSelectionCriteria}
 import org.slf4j.LoggerFactory
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
-import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, FlightsWithSplits, Updatable}
+import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, FlightsWithSplits}
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage, SplitsForArrivalsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FlightsDiffMessage, UniqueArrivalMessage}
@@ -64,7 +64,7 @@ trait FlightActorLike {
         val nowMillis = SDate.now().millisSinceEpoch
         val flightsWithSplits = FlightsWithSplits(byArrivalKey.values.map(a => ApiFlightWithSplits(a, Set(), None)))
         splitsForArrivalsFromMessage(msg).applyTo(flightsWithSplits, nowMillis, List()) match {
-          case (FlightsWithSplits(flights), _) =>
+          case (FlightsWithSplits(flights), _, _, _) =>
             flights.values.foreach(f => byArrivalKey = byArrivalKey.updated(ArrivalKey(f.apiFlight), f.apiFlight))
         }
     }

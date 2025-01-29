@@ -4,9 +4,9 @@ import akka.actor.ActorRef
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
-import uk.gov.homeoffice.drt.actor.TerminalDateActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightMessageConversions.arrivalKeyFromMessage
 import uk.gov.homeoffice.drt.analytics.prediction.flights.FlightValueExtractionActor.{PreProcessingFinished, noCtaOrDomestic}
 import uk.gov.homeoffice.drt.arrivals.Arrival
@@ -19,7 +19,6 @@ import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.flig
 import uk.gov.homeoffice.drt.time.UtcDate
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-
 
 object FlightValueExtractionActor {
   case class PreProcessingFinished(arrivals: Iterable[Arrival])
