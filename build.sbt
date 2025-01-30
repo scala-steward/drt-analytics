@@ -1,25 +1,25 @@
 
-ThisBuild / scalaVersion := "2.13.12"
+ThisBuild / scalaVersion := "2.13.15"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v760"
+lazy val drtLib = "v1072"
 
-lazy val akkaHttpVersion = "10.5.3"
-lazy val akkaVersion = "2.8.5"
-lazy val akkaPersistenceJdbcVersion = "5.2.0"
-lazy val postgresVersion = "42.7.0"
-lazy val jodaTimeVersion = "2.12.5"
-lazy val jacksonDatabindVersion = "2.15.3"
-lazy val specs2Version = "4.20.3"
-lazy val sparkVersion = "3.5.0"
-lazy val scalaTestVersion = "3.2.17"
+lazy val akkaVersion = "2.9.5" // last version with license key requirement
+lazy val akkaHttpVersion = "10.6.3" // last version dependent on akka 2.9.5
+lazy val akkaPersistenceJdbcVersion = "5.4.2"
+
+lazy val postgresVersion = "42.7.5"
+lazy val jodaTimeVersion = "2.12.7"
+lazy val jacksonDatabindVersion = "2.16.1"
+lazy val specs2Version = "4.20.9"
+lazy val sparkVersion = "3.5.4"
+lazy val scalaTestVersion = "3.2.19"
 lazy val catsVersion = "2.10.0"
-lazy val awsJava2SdkVersion = "2.13.76"
+lazy val awsJava2SdkVersion = "2.30.2"
 lazy val sslConfigCoreVersion = "0.6.1"
 lazy val scalaXmlVersion = "2.2.0"
-lazy val log4jLayoutTemplateJsonVersion = "2.22.1"
 lazy val logbackClassicVersion = "1.4.14"
 lazy val logbackJsonClassicVersion = "0.1.5"
 lazy val logbackJacksonVersion = "0.1.5"
@@ -60,8 +60,11 @@ lazy val root = (project in file("."))
     name := "drt-analytics",
     trapExit := false,
 
-    resolvers += "Artifactory Realm" at "https://artifactory.digital.homeoffice.gov.uk/",
-    resolvers += "Artifactory Realm release local" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
+    resolvers ++= Seq(
+      "Akka library repository".at("https://repo.akka.io/maven"),
+      "Artifactory Realm libs release" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
+    ),
+
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
 
     dockerBaseImage := "openjdk:11-jre-slim-buster",
@@ -71,3 +74,22 @@ lazy val root = (project in file("."))
   )
   .enablePlugins(DockerPlugin)
   .enablePlugins(JavaAppPackaging)
+
+assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", "MANIFEST.MF") =>
+    val log = sLog.value
+    log.info("discarding MANIFEST.MF")
+    MergeStrategy.discard
+  case PathList("reference.conf") =>
+    val log = sLog.value
+    log.info("concatinating reference.conf")
+    MergeStrategy.concat
+  case PathList("version.conf") =>
+    val log = sLog.value
+    log.info("concatinating version.conf")
+    MergeStrategy.concat
+  case default =>
+    val log = sLog.value
+    log.debug(s"keeping last $default")
+    MergeStrategy.last
+}

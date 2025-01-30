@@ -11,7 +11,7 @@ import scala.concurrent.Future
 object NoOpPersistence extends ModelPersistence {
   private val log = LoggerFactory.getLogger(getClass)
 
-  override def getModels(validModelNames: Seq[String]): PredictionModelActor.WithId => Future[PredictionModelActor.Models] =
+  override def getModels(validModelNames: Seq[String], maybePointInTime: Option[Long]): PredictionModelActor.WithId => Future[PredictionModelActor.Models] =
     _ => Future.successful(PredictionModelActor.Models(Map()))
 
   override val persist: (PredictionModelActor.WithId, Int, LinearRegressionModel, FeaturesWithOneToManyValues, Int, Double, String) => Future[Done] =

@@ -3,7 +3,7 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.actor.PredictionModelActor
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, ArrivalGenerator, Passengers}
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
 import uk.gov.homeoffice.drt.ports.UnknownFeedSource

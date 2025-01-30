@@ -2,14 +2,14 @@ package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
-import uk.gov.homeoffice.drt.arrivals.{ApiFlightWithSplits, Arrival, ArrivalGenerator, EventTypes, Passengers, SplitStyle, Splits, SplitsForArrivals}
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
+import uk.gov.homeoffice.drt.arrivals._
 import uk.gov.homeoffice.drt.ports.SplitRatiosNs.SplitSources
 import uk.gov.homeoffice.drt.ports.Terminals.{T1, T2}
-import uk.gov.homeoffice.drt.ports.{ApiFeedSource, ApiPaxTypeAndQueueCount, PaxTypes, Queues, UnknownFeedSource}
-import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage, PaxTypeAndQueueCountMessage, SplitMessage, SplitsForArrivalMessage, SplitsForArrivalsMessage}
+import uk.gov.homeoffice.drt.ports._
+import uk.gov.homeoffice.drt.protobuf.messages.CrunchState.{FlightWithSplitsMessage, FlightsWithSplitsDiffMessage, FlightsWithSplitsMessage}
 import uk.gov.homeoffice.drt.protobuf.messages.FlightsMessage.{FlightsDiffMessage, UniqueArrivalMessage}
-import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.{flightMessageToApiFlight, flightWithSplitsToMessage, splitsForArrivalsToMessage, uniqueArrivalToMessage}
+import uk.gov.homeoffice.drt.protobuf.serialisation.FlightMessageConversion.{flightMessageToApiFlight, flightWithSplitsToMessage, splitsForArrivalsToMessage}
 import uk.gov.homeoffice.drt.time.{SDate, UtcDate}
 
 class FlightActorLikeSpec extends AnyWordSpec with Matchers {

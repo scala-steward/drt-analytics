@@ -34,6 +34,7 @@ object ArrivalGenerator {
       rawIATA = iata,
       Terminal = terminal,
       Origin = origin,
+      PreviousPort = None,
       Operator = operator,
       Status = status,
       Estimated = if (estDt.nonEmpty) Option(SDate.parseString(estDt).millisSinceEpoch) else None,

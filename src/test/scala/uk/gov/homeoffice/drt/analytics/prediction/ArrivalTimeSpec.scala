@@ -8,8 +8,8 @@ import akka.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
-import uk.gov.homeoffice.drt.actor.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
+import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
 import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.arrivals.ArrivalGenerator
 import uk.gov.homeoffice.drt.ports.PortCode

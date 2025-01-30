@@ -27,7 +27,7 @@ object ArrivalsHelper {
       ).getOrElse(0)
 
       val pctOk = pctWithMaxPax(arrivals)
-      if (pctOk < 80) {
+      if (pctOk < 95) {
         val arrivalsActor = system.actorOf(ArrivalsActor.props(FeedPersistenceIds.forecastBase, SDate(date)))
         arrivalsActor
           .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
