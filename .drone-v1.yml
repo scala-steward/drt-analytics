@@ -76,7 +76,7 @@ steps:
       branch:
         - leader
     depends_on:
-      - Unit tests
+      - Publish app
 
   - name: Scapegoat
     pull: if-not-exists
