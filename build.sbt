@@ -33,26 +33,28 @@ libraryDependencies ++= Seq(
 
   "com.fasterxml.jackson.core" % "jackson-databind" % jacksonDatabindVersion,
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonDatabindVersion,
-  "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
 
   "org.apache.spark" %% "spark-mllib" % sparkVersion,
   "org.apache.spark" %% "spark-sql" % sparkVersion,
   "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
-  "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
+  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+  "com.typesafe.akka" %% "akka-pki" % akkaVersion,
   "com.lightbend.akka" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
   "org.postgresql" % "postgresql" % postgresVersion,
-  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
-  "org.specs2" %% "specs2-core" % specs2Version % Test,
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
   "com.typesafe" %% "ssl-config-core" % sslConfigCoreVersion,
+
+  "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
+  "org.specs2" %% "specs2-core" % specs2Version % Test,
+  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
+  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
+  "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
 )
 
 lazy val root = (project in file("."))
