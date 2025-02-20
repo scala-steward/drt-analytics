@@ -11,7 +11,7 @@ lazy val akkaHttpVersion = "10.6.3" // last version dependent on akka 2.9.5
 lazy val akkaPersistenceJdbcVersion = "5.4.2"
 
 lazy val postgresVersion = "42.7.5"
-lazy val jodaTimeVersion = "2.12.7"
+lazy val jodaTimeVersion = "2.13.1"
 lazy val jacksonDatabindVersion = "2.16.1"
 lazy val specs2Version = "4.20.9"
 lazy val sparkVersion = "3.5.4"
