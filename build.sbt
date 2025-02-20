@@ -1,10 +1,10 @@
 
-ThisBuild / scalaVersion := "2.13.15"
+ThisBuild / scalaVersion := "2.13.16"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v1072"
+lazy val drtLib = "v1085"
 
 lazy val akkaVersion = "2.9.5" // last version with license key requirement
 lazy val akkaHttpVersion = "10.6.3" // last version dependent on akka 2.9.5
@@ -12,15 +12,15 @@ lazy val akkaPersistenceJdbcVersion = "5.4.2"
 
 lazy val postgresVersion = "42.7.5"
 lazy val jodaTimeVersion = "2.13.1"
-lazy val jacksonDatabindVersion = "2.16.1"
+lazy val jacksonDatabindVersion = "2.16.2"
 lazy val specs2Version = "4.20.9"
 lazy val sparkVersion = "3.5.4"
 lazy val scalaTestVersion = "3.2.19"
-lazy val catsVersion = "2.10.0"
+lazy val catsVersion = "2.13.0"
 lazy val awsJava2SdkVersion = "2.30.23"
 lazy val sslConfigCoreVersion = "0.6.1"
-lazy val scalaXmlVersion = "2.2.0"
-lazy val logbackClassicVersion = "1.4.14"
+lazy val scalaXmlVersion = "2.3.0"
+lazy val logbackClassicVersion = "1.5.16"
 lazy val logbackJsonClassicVersion = "0.1.5"
 lazy val logbackJacksonVersion = "0.1.5"
 
