@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics
 
-import akka.Done
-import akka.actor.ActorSystem
-import akka.util.Timeout
+import org.apache.pekko.Done
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.persistence.NoOpPersistence

@@ -1,10 +1,10 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
-import akka.NotUsed
-import akka.actor.{ActorSystem, PoisonPill, Props}
-import akka.pattern.ask
-import akka.stream.scaladsl.Source
-import akka.util.Timeout
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.{ActorSystem, PoisonPill, Props}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.Timeout
 import org.slf4j.LoggerFactory
 import scalapb.GeneratedMessage
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId

@@ -1,9 +1,9 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
-import akka.actor.{Actor, ActorSystem}
-import akka.stream.scaladsl.Sink
-import akka.testkit.TestKit
-import akka.util.Timeout
+import org.apache.pekko.actor.{Actor, ActorSystem}
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin

@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
-import akka.{Done, NotUsed}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}

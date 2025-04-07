@@ -6,9 +6,10 @@ ThisBuild / organizationName := "drt"
 
 lazy val drtLib = "v1085"
 
-lazy val akkaVersion = "2.9.5" // last version with license key requirement
-lazy val akkaHttpVersion = "10.6.3" // last version dependent on akka 2.9.5
-lazy val akkaPersistenceJdbcVersion = "5.4.2"
+
+lazy val pekkoVersion = "1.1.3"
+lazy val pekkoHttpVersion = "1.1.0"
+lazy val pekkoPersistenceJdbcVersion = "1.1.0"
 
 lazy val postgresVersion = "42.7.5"
 lazy val jodaTimeVersion = "2.13.1"
@@ -25,7 +26,7 @@ lazy val logbackJsonClassicVersion = "0.1.5"
 lazy val logbackJacksonVersion = "0.1.5"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+  "org.apache.pekko" %% "pekko-slf4j" % pekkoVersion,
 
   "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
   "ch.qos.logback.contrib" % "logback-json-classic" % logbackJsonClassicVersion,
@@ -37,12 +38,12 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-mllib" % sparkVersion,
   "org.apache.spark" %% "spark-sql" % sparkVersion,
   "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
-  "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-  "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
-  "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-  "com.typesafe.akka" %% "akka-pki" % akkaVersion,
-  "com.lightbend.akka" %% "akka-persistence-jdbc" % akkaPersistenceJdbcVersion,
+  "org.apache.pekko" %% "pekko-http" % pekkoHttpVersion,
+  "org.apache.pekko" %% "pekko-persistence" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-persistence-query" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-pki" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-persistence-jdbc" % pekkoPersistenceJdbcVersion,
   "org.postgresql" % "postgresql" % postgresVersion,
   "joda-time" % "joda-time" % jodaTimeVersion,
   "uk.gov.homeoffice" %% "drt-lib" % drtLib,
@@ -52,9 +53,9 @@ libraryDependencies ++= Seq(
 
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
-  "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
-  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
-  "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
+  "org.apache.pekko" %% "pekko-testkit" % pekkoVersion % Test,
+  "org.apache.pekko" %% "pekko-stream-testkit" % pekkoVersion % Test,
+  "org.apache.pekko" %% "pekko-persistence-testkit" % pekkoVersion % Test,
 )
 
 lazy val root = (project in file("."))
@@ -63,7 +64,6 @@ lazy val root = (project in file("."))
     trapExit := false,
 
     resolvers ++= Seq(
-      "Akka library repository".at("https://repo.akka.io/maven"),
       "Artifactory Realm libs release" at "https://artifactory.digital.homeoffice.gov.uk/artifactory/libs-release/",
     ),
 

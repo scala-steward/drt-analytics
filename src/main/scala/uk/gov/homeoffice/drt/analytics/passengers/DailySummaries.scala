@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.passengers
 
-import akka.actor.{ActorSystem, PoisonPill, Props}
-import akka.pattern.ask
-import akka.util.Timeout
+import org.apache.pekko.actor.{ActorSystem, PoisonPill, Props}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.util.Timeout
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.{ArrivalsActor, FeedPersistenceIds, GetArrivals}

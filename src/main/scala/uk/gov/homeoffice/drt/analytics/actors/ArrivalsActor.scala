@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.actor.Props
-import akka.persistence._
+import org.apache.pekko.actor.Props
+import org.apache.pekko.persistence._
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.messages.MessageConversion

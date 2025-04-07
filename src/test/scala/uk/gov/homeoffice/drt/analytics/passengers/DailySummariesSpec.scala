@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.passengers
 
-import akka.actor.{Actor, ActorSystem, Props}
-import akka.stream.Materializer
-import akka.testkit.TestKit
+import org.apache.pekko.actor.{Actor, ActorSystem, Props}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.testkit.TestKit
 import org.specs2.mutable.SpecificationLike
 import uk.gov.homeoffice.drt.analytics.actors.{FeedPersistenceIds, GetArrivals}
 import uk.gov.homeoffice.drt.analytics.{Arrivals, DailyPaxCountsOnDay, SimpleArrival}
