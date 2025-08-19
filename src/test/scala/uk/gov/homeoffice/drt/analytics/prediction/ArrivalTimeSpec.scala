@@ -1,10 +1,10 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.actor.{ActorSystem, Props, Terminated}
-import akka.pattern.ask
-import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
-import akka.util.Timeout
+import org.apache.pekko.actor.{ActorSystem, Props, Terminated}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.util.Timeout
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin

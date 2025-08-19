@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.prediction.dump
 
-import akka.Done
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.Done
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.SparkSession
 import org.joda.time.DateTimeZone

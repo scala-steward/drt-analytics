@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.s3
 
-import akka.Done
+import org.apache.pekko.Done
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncRequestBody
 import software.amazon.awssdk.services.s3.S3AsyncClient

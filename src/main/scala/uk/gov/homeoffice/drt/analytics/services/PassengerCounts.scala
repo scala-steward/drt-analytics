@@ -1,10 +1,10 @@
 package uk.gov.homeoffice.drt.analytics.services
 
-import akka.Done
-import akka.actor.{ActorSystem, Props}
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.Timeout
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.util.Timeout
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.analytics.PaxDeltas
 import uk.gov.homeoffice.drt.analytics.actors.PassengersActor

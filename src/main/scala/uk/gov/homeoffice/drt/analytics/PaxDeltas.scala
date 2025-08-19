@@ -1,10 +1,10 @@
 package uk.gov.homeoffice.drt.analytics
 
-import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem}
-import akka.pattern.ask
-import akka.stream.scaladsl.Source
-import akka.util.Timeout
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.Timeout
 import org.joda.time.DateTimeZone
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.actors.FeedPersistenceIds

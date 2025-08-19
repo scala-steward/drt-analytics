@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.actor.Actor
+import org.apache.pekko.actor.Actor
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.time.UtcDate

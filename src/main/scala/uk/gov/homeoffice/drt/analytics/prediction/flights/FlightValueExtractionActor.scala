@@ -1,7 +1,7 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
-import akka.actor.ActorRef
-import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState

@@ -1,8 +1,8 @@
 package uk.gov.homeoffice.drt.analytics.services
 
-import akka.actor.ActorSystem
-import akka.pattern.ask
-import akka.util.Timeout
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.util.Timeout
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.analytics.Arrivals
 import uk.gov.homeoffice.drt.analytics.actors.{ArrivalsActor, FeedPersistenceIds, GetArrivals}
@@ -32,7 +32,7 @@ object ArrivalsHelper {
         arrivalsActor
           .ask(GetArrivals(SDate(date), SDate(date).addDays(1))).mapTo[Arrivals]
           .map { baseArrivals =>
-            arrivalsActor ! akka.actor.PoisonPill
+            arrivalsActor ! org.apache.pekko.actor.PoisonPill
 
             arrivals.map {
               arr =>

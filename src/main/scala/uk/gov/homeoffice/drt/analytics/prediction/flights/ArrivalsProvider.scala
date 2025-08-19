@@ -1,10 +1,10 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
-import akka.actor.{ActorSystem, PoisonPill, Props}
-import akka.pattern.ask
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.Timeout
+import org.apache.pekko.actor.{ActorSystem, PoisonPill, Props}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.util.Timeout
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.populateMaxPax

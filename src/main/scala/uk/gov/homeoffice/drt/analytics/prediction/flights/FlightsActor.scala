@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
-import akka.persistence.{PersistentActor, Recovery, SnapshotOffer, SnapshotSelectionCriteria}
+import org.apache.pekko.persistence.{PersistentActor, Recovery, SnapshotOffer, SnapshotSelectionCriteria}
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey

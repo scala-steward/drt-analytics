@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.persistence
 
-import akka.Done
+import org.apache.pekko.Done
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.PredictionModelActor

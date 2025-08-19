@@ -1,9 +1,9 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.stream.scaladsl.Source
-import akka.testkit.{TestKit, TestProbe}
-import akka.util.Timeout
+import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props}
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.testkit.{TestKit, TestProbe}
+import org.apache.pekko.util.Timeout
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.homeoffice.drt.actor.PredictionModelActor._

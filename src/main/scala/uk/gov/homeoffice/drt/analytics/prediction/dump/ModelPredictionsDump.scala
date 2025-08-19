@@ -1,6 +1,6 @@
 package uk.gov.homeoffice.drt.analytics.prediction.dump
 
-import akka.Done
+import org.apache.pekko.Done
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.SparkSession
 import uk.gov.homeoffice.drt.analytics.prediction.DataSet

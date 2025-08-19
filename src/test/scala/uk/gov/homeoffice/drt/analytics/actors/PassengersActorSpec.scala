@@ -1,12 +1,12 @@
 package uk.gov.homeoffice.drt.analytics.actors
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.pattern.ask
-import akka.persistence.SaveSnapshotSuccess
-import akka.persistence.testkit.{PersistenceTestKitPlugin, PersistenceTestKitSnapshotPlugin}
-import akka.persistence.testkit.scaladsl.{PersistenceTestKit, SnapshotTestKit}
-import akka.testkit.{TestKit, TestProbe}
-import akka.util.Timeout
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.persistence.SaveSnapshotSuccess
+import org.apache.pekko.persistence.testkit.{PersistenceTestKitPlugin, PersistenceTestKitSnapshotPlugin}
+import org.apache.pekko.persistence.testkit.scaladsl.{PersistenceTestKit, SnapshotTestKit}
+import org.apache.pekko.testkit.{TestKit, TestProbe}
+import org.apache.pekko.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.SpecificationLike
 import org.specs2.specification.BeforeEach
