@@ -10,7 +10,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.TerminalFlightNumberOrigin
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor.ArrivalKey
-import uk.gov.homeoffice.drt.analytics.prediction.flights.{FlightValueExtractionActor, ValuesExtractor}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.{ArrivalValueExtraction, FlightValueExtractionActor, ValuesExtractor}
 import uk.gov.homeoffice.drt.arrivals.ArrivalGenerator
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.Terminals.T2
@@ -66,12 +66,9 @@ class ArrivalTimeSpec extends AnyWordSpec with Matchers {
             val start = scheduled.getLocalLastMidnight
             val days = 10
 
-            val arrivals = ValuesExtractor(
-              classOf[FlightValueExtractionActor],
-              minutesOffSchedule(Seq()),
-              TerminalFlightNumberOrigin.fromArrival,
-              (_, a) => Future.successful(a)
-            ).extractValuesByKey(T2, start, days)
+            val extraction = ArrivalValueExtraction((_, _) => Future.successful(Seq()), minutesOffSchedule(Seq()), TerminalFlightNumberOrigin.fromArrival, (_, a) => Future.successful(a))
+
+            val arrivals = ValuesExtractor(extraction).extractValuesByKey(T2, start, days)
 
             val result = Await.result(arrivals.runWith(Sink.seq), 5.seconds)
 

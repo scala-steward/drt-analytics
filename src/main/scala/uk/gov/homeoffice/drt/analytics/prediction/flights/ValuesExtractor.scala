@@ -1,31 +1,19 @@
 package uk.gov.homeoffice.drt.analytics.prediction.flights
 
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.{ActorSystem, PoisonPill, Props}
-import org.apache.pekko.pattern.ask
 import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.util.Timeout
 import org.slf4j.LoggerFactory
 import scalapb.GeneratedMessage
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
-import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.actors.TerminalDateActor
-import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.time.{SDateLike, UtcDate}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 
-case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](actorClass: Class[T],
-                                                                             extractValues: _ => Option[(Double, Seq[String], Seq[Double], String)],
-                                                                             extractKey: M => Option[WithId],
-                                                                             preProcess: (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]],
-                                                                            )
-                                                                            (implicit system: ActorSystem,
-                                                                             ec: ExecutionContext,
-                                                                             timeout: Timeout
-                                                                            ) {
+case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](extraction: (UtcDate, Terminal) => Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]])
+                                                                            (implicit ec: ExecutionContext) {
   private val log = LoggerFactory.getLogger(getClass)
 
   val extractValuesByKey: (Terminal, SDateLike, Int) => Source[(WithId, Iterable[(Double, Seq[String], Seq[Double], String)]), NotUsed] =
@@ -46,22 +34,45 @@ case class ValuesExtractor[T <: TerminalDateActor[_], M <: GeneratedMessage](act
     }
 
   private def extractValuesForDate(terminal: Terminal, date: UtcDate)
-                                  (implicit system: ActorSystem,
-                                   ec: ExecutionContext,
-                                   timeout: Timeout
-                                  ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
-    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
-    actor
-      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]]
-      .map { featuresAndValuesForDate =>
-        actor ! PoisonPill
-        featuresAndValuesForDate
-      }
-      .recoverWith {
-        case t: Throwable =>
-          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
-          actor ! PoisonPill
-          Future.failed(t)
-      }
+                                  (implicit ec: ExecutionContext): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
+//    val extraction: (UtcDate, Terminal) => Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = ArrivalValueExtraction(arrivalsForDateAndTerminal, extractValues, extractKey, preProcess)
+    extraction(date, terminal).map { featuresAndValuesForDate =>
+      log.info(s"Extracted ${featuresAndValuesForDate.size} features for $terminal on $date")
+      featuresAndValuesForDate
+    }
+
+//    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
+//    actor
+//      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]]
+//      .map { featuresAndValuesForDate =>
+//        actor ! PoisonPill
+//        featuresAndValuesForDate
+//      }
+//      .recoverWith {
+//        case t: Throwable =>
+//          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
+//          actor ! PoisonPill
+//          Future.failed(t)
+//      }
   }
+
+//  private def extractValuesForDate__old(terminal: Terminal, date: UtcDate)
+//                                  (implicit system: ActorSystem,
+//                                   ec: ExecutionContext,
+//                                   timeout: Timeout
+//                                  ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
+//    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
+//    actor
+//      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]]
+//      .map { featuresAndValuesForDate =>
+//        actor ! PoisonPill
+//        featuresAndValuesForDate
+//      }
+//      .recoverWith {
+//        case t: Throwable =>
+//          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
+//          actor ! PoisonPill
+//          Future.failed(t)
+//      }
+//  }
 }

@@ -4,7 +4,7 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v1122"
+lazy val drtLib = "v1239"
 
 
 lazy val pekkoVersion = "1.1.3"

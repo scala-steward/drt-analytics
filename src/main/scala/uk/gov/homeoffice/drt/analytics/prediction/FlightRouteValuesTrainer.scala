@@ -15,7 +15,7 @@ import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports._
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
 import uk.gov.homeoffice.drt.prediction.arrival.features.Feature
-import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
+import uk.gov.homeoffice.drt.time.{LocalDate, SDate, SDateLike}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.SeqHasAsJava
@@ -34,6 +34,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                                     upperQuantile: Double,
                                     persistence: ModelPersistence,
                                     dumper: ModelPredictionsDump,
+                                    terminals: LocalDate => Iterable[Terminal],
                                    )
                                    (implicit
                                     executionContext: ExecutionContext,
@@ -47,8 +48,8 @@ case class FlightRouteValuesTrainer(modelName: String,
     .config("spark.master", "local")
     .getOrCreate()
 
-  def trainTerminals(portCode: String, terminals: List[Terminal]): Future[Done] =
-    Source(terminals)
+  def trainTerminals(portCode: String): Future[Done] =
+    Source(terminals(SDate.now().toLocalDate).toList)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
         train(daysOfTrainingData, 40, portCode, terminal).map(r => logStats(terminal, r))
