@@ -33,44 +33,9 @@ case class ValuesExtractor(extraction: (UtcDate, Terminal) => Future[Map[WithId,
 
   private def extractValuesForDate(terminal: Terminal, date: UtcDate)
                                   (implicit ec: ExecutionContext): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
-    //    val extraction: (UtcDate, Terminal) => Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = ArrivalValueExtraction(arrivalsForDateAndTerminal, extractValues, extractKey, preProcess)
     extraction(date, terminal).map { featuresAndValuesForDate =>
       log.info(s"Extracted ${featuresAndValuesForDate.size} features for $terminal on $date")
       featuresAndValuesForDate
     }
-
-    //    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
-    //    actor
-    //      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]]
-    //      .map { featuresAndValuesForDate =>
-    //        actor ! PoisonPill
-    //        featuresAndValuesForDate
-    //      }
-    //      .recoverWith {
-    //        case t: Throwable =>
-    //          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
-    //          actor ! PoisonPill
-    //          Future.failed(t)
-    //      }
   }
-
-  //  private def extractValuesForDate__old(terminal: Terminal, date: UtcDate)
-  //                                  (implicit system: ActorSystem,
-  //                                   ec: ExecutionContext,
-  //                                   timeout: Timeout
-  //                                  ): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
-  //    val actor = system.actorOf(Props(actorClass, terminal, date, extractValues, extractKey, preProcess))
-  //    actor
-  //      .ask(GetState).mapTo[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]]
-  //      .map { featuresAndValuesForDate =>
-  //        actor ! PoisonPill
-  //        featuresAndValuesForDate
-  //      }
-  //      .recoverWith {
-  //        case t: Throwable =>
-  //          log.error(s"Failed to get arrivals for $terminal $date: ${t.getMessage}")
-  //          actor ! PoisonPill
-  //          Future.failed(t)
-  //      }
-  //  }
 }
