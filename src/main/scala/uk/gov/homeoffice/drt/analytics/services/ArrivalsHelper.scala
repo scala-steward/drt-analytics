@@ -41,7 +41,7 @@ object ArrivalsHelper {
                 arr.copy(MaxPax = maybeMaxPax)
             }
           }
-          .map{ a =>
+          .map { a =>
             val pctOk2 = pctWithMaxPax(a)
             log.info(s"Populated max pax for $date, was $pctOk%, now $pctOk2% of ${arrivals.size} arrivals have max pax")
             a
