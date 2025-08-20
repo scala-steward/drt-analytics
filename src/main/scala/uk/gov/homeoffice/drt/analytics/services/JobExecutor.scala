@@ -26,6 +26,7 @@ case class JobExecutor(config: Config,
                        portCode: PortCode,
                        predictionWriters: Iterable[(String, String) => Future[Done]],
                        persistence: ModelPersistence,
+                       aggregatedDb: AggregatedDbTables,
                       )
                       (implicit ec: ExecutionContext, timeout: Timeout, system: ActorSystem) {
   private val log: Logger = LoggerFactory.getLogger(getClass)
@@ -81,11 +82,6 @@ case class JobExecutor(config: Config,
                           upperQuantile: Double,
                           dumpStats: ModelPredictionsDump,
                          ): Future[Done] = {
-
-    val dataPersistence = if (config.getString("environment") == "production") "persistent" else "in-memory"
-
-    val aggregatedDb: AggregatedDbTables = AggregatedDbTables(dataPersistence)
-
     val arrivalsForDateAndTerminal: (UtcDate, Terminal) => Future[Seq[Arrival]] =
       (date, terminal) => aggregatedDb.run(
         FlightDao().getForTerminalsUtcDate(PortCode(portCode))(Seq(terminal), date)
