@@ -60,7 +60,7 @@ class FlightRouteValuesTrainerSpec
       val probe = TestProbe("test-probe")
 
       val trainer1 = getTrainer(examples(1), probe.ref)
-      trainer1.trainTerminals("LHR", List(T2))
+      trainer1.trainTerminals("LHR")
       probe.expectMsg(10.seconds, RemoveModel("some-model"))
       trainer1.session.stop()
     }
@@ -69,7 +69,7 @@ class FlightRouteValuesTrainerSpec
       val probe = TestProbe("test-probe")
 
       val trainer2 = getTrainer(examples(10), probe.ref)
-      trainer2.trainTerminals("LHR", List(T2))
+      trainer2.trainTerminals("LHR")
       probe.expectMsg(60.seconds, "model update")
       trainer2.session.stop()
     }
@@ -89,7 +89,8 @@ class FlightRouteValuesTrainerSpec
       lowerQuantile = 0.1,
       upperQuantile = 0.9,
       persistence = MockPersistence(probe),
-      dumper = NoOpDump
+      dumper = NoOpDump,
+      _ => Seq(T2),
     )
   }
 }

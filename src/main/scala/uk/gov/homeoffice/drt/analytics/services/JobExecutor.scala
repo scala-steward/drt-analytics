@@ -1,20 +1,23 @@
 package uk.gov.homeoffice.drt.analytics.services
 
+import com.typesafe.config.Config
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.util.Timeout
-import com.typesafe.config.Config
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.analytics.prediction.dump.{ModelPredictionsDump, NoOpDump, PaxPredictionDump}
-import uk.gov.homeoffice.drt.analytics.prediction.flights.{ArrivalsProvider, FlightValueExtractionActor, ValuesExtractor}
+import uk.gov.homeoffice.drt.analytics.prediction.flights.{ArrivalValueExtraction, ArrivalsProvider, ValuesExtractor}
 import uk.gov.homeoffice.drt.analytics.prediction.modeldefinitions.{OffScheduleModelDefinition, PaxCapModelDefinition, ToChoxModelDefinition, WalkTimeModelDefinition}
 import uk.gov.homeoffice.drt.analytics.prediction.{FlightRouteValuesTrainer, ModelDefinition}
 import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.{noopPreProcess, populateMaxPax}
 import uk.gov.homeoffice.drt.arrivals.Arrival
+import uk.gov.homeoffice.drt.db.AggregatedDbTables
+import uk.gov.homeoffice.drt.db.dao.FlightDao
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, PortCode}
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
-import uk.gov.homeoffice.drt.time.UtcDate
+import uk.gov.homeoffice.drt.time.{LocalDate, UtcDate}
 
 import java.nio.file.{Files, Paths}
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,6 +26,7 @@ case class JobExecutor(config: Config,
                        portCode: PortCode,
                        predictionWriters: Iterable[(String, String) => Future[Done]],
                        persistence: ModelPersistence,
+                       aggregatedDb: AggregatedDbTables,
                       )
                       (implicit ec: ExecutionContext, timeout: Timeout, system: ActorSystem) {
   private val log: Logger = LoggerFactory.getLogger(getClass)
@@ -70,20 +74,24 @@ case class JobExecutor(config: Config,
 
   private def fileExists(path: String): Boolean = path.nonEmpty && Files.exists(Paths.get(path))
 
-  private def trainModels[T](modDef: ModelDefinition[T, Terminal],
-                             portCode: String,
-                             terminals: Iterable[Terminal],
-                             preProcess: (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]],
-                             lowerQuantile: Double,
-                             upperQuantile: Double,
-                             dumpStats: ModelPredictionsDump,
-                            ): Future[Done] = {
-    val examplesProvider = ValuesExtractor(
-      classOf[FlightValueExtractionActor],
-      modDef.targetValueAndFeatures,
-      modDef.aggregateValue,
-      preProcess
-    ).extractValuesByKey
+  private def trainModels(modDef: ModelDefinition[Arrival, Terminal],
+                          portCode: String,
+                          terminals: LocalDate => Iterable[Terminal],
+                          preProcess: (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]],
+                          lowerQuantile: Double,
+                          upperQuantile: Double,
+                          dumpStats: ModelPredictionsDump,
+                         ): Future[Done] = {
+    val arrivalsForDateAndTerminal: (UtcDate, Terminal) => Future[Seq[Arrival]] =
+      (date, terminal) => aggregatedDb.run(
+        FlightDao().getForTerminalsUtcDate(PortCode(portCode))(Seq(terminal), date)
+          .map(_.map(_.apiFlight))
+      )
+
+    val extraction: (UtcDate, Terminal) => Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] =
+      ArrivalValueExtraction(arrivalsForDateAndTerminal, modDef.targetValueAndFeatures, modDef.aggregateValue, preProcess)
+
+    val examplesProvider = ValuesExtractor(extraction).extractValuesByKey
 
     val trainer = FlightRouteValuesTrainer(
       modelName = modDef.modelName,
@@ -96,10 +104,11 @@ case class JobExecutor(config: Config,
       upperQuantile = upperQuantile,
       persistence = persistence,
       dumper = dumpStats,
+      terminals = terminals,
     )
 
     trainer
-      .trainTerminals(portCode, terminals.toList)
+      .trainTerminals(portCode)
       .map { d =>
         trainer.session.stop()
         d

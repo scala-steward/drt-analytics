@@ -8,6 +8,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import uk.gov.homeoffice.drt.analytics.persistence.NoOpPersistence
 import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.analytics.services.JobExecutor
+import uk.gov.homeoffice.drt.db.AggregatedDbTables
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
@@ -60,7 +61,11 @@ object AnalyticsApp {
       case Some(portConfig) =>
         log.info(s"Looking for job ${config.getString("options.job-name")}")
         val persistence: ModelPersistence = if (config.getBoolean("options.dry-run")) NoOpPersistence else Flight()
-        val executor = JobExecutor(config, portCode, writePredictions, persistence)
+        val dataPersistenceType = if (config.getString("environment") == "production") "persistent" else "in-memory"
+
+        val aggregatedDb: AggregatedDbTables = AggregatedDbTables(dataPersistenceType)
+
+        val executor = JobExecutor(config, portCode, writePredictions, persistence, aggregatedDb)
         val jobName = config.getString("options.job-name").toLowerCase
         val eventualUpdates = executor.executeJob(portConfig, jobName)
 
