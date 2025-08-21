@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import uk.gov.homeoffice.drt.actor.PredictionModelActor.WithId
 import uk.gov.homeoffice.drt.analytics.prediction.FlightRouteValuesTrainer.ModelExamplesProvider
 import uk.gov.homeoffice.drt.analytics.prediction.dump.ModelPredictionsDump
+import uk.gov.homeoffice.drt.notifications.SlackClient
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports._
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
@@ -35,6 +36,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                                     persistence: ModelPersistence,
                                     dumper: ModelPredictionsDump,
                                     terminals: (LocalDate, LocalDate) => Iterable[Terminal],
+                                    slackClient: SlackClient,
                                    )
                                    (implicit
                                     executionContext: ExecutionContext,
@@ -55,9 +57,14 @@ case class FlightRouteValuesTrainer(modelName: String,
     Source(terminals(startDate.toLocalDate, endDate).toList)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
-        train(daysOfTrainingData, 40, portCode, terminal).map(r => logStats(terminal, r))
+        train(daysOfTrainingData, 40, portCode, terminal)
+          .map { r =>
+            slackClient.notify(s":tick: Trained $modelName for $portCode :: $terminal")
+            logStats(terminal, r)
+          }
           .recover {
             case t =>
+              slackClient.notify(s":x: Failed to train $modelName for $portCode :: $terminal: ${t.getMessage}")
               log.error(s"Failed to train $modelName for $terminal", t)
           }
       }

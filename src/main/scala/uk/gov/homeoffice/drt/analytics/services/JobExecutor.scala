@@ -14,6 +14,7 @@ import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.{noopPreProcess, 
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.db.AggregatedDbTables
 import uk.gov.homeoffice.drt.db.dao.FlightDao
+import uk.gov.homeoffice.drt.notifications.SlackClient
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, PortCode}
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
@@ -27,6 +28,7 @@ case class JobExecutor(config: Config,
                        predictionWriters: Iterable[(String, String) => Future[Done]],
                        persistence: ModelPersistence,
                        aggregatedDb: AggregatedDbTables,
+                       slackClient: SlackClient,
                       )
                       (implicit ec: ExecutionContext, timeout: Timeout, system: ActorSystem) {
   private val log: Logger = LoggerFactory.getLogger(getClass)
@@ -105,6 +107,7 @@ case class JobExecutor(config: Config,
       persistence = persistence,
       dumper = dumpStats,
       terminals = terminals,
+      slackClient = slackClient,
     )
 
     trainer

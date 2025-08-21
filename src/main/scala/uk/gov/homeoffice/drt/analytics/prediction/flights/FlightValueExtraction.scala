@@ -18,7 +18,6 @@ object FlightMessageConversions {
     } yield {
       ArrivalKey(scheduled, terminal, flightNumber)
     }
-
 }
 
 object ArrivalValueExtraction {
@@ -41,10 +40,10 @@ object ArrivalValueExtraction {
         }
     }
 
-  def extractions(byArrivalKeyProcessed: Map[ArrivalKey, Arrival],
-                  extractValues: Arrival => Option[(Double, Seq[String], Seq[Double], String)],
-                  extractKey: Arrival => Option[WithId]
-                 ): Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]] =
+  private def extractions(byArrivalKeyProcessed: Map[ArrivalKey, Arrival],
+                          extractValues: Arrival => Option[(Double, Seq[String], Seq[Double], String)],
+                          extractKey: Arrival => Option[WithId]
+                         ): Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]] =
     byArrivalKeyProcessed
       .groupBy {
         case (_, arrival) => extractKey(arrival)
@@ -57,5 +56,4 @@ object ArrivalValueExtraction {
             .collect { case Some(value) => value }
           (key, examples)
       }
-
 }
