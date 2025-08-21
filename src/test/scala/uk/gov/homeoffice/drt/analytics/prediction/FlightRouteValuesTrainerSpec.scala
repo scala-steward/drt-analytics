@@ -90,7 +90,7 @@ class FlightRouteValuesTrainerSpec
       upperQuantile = 0.9,
       persistence = MockPersistence(probe),
       dumper = NoOpDump,
-      _ => Seq(T2),
+      (_, _) => Seq(T2),
     )
   }
 }

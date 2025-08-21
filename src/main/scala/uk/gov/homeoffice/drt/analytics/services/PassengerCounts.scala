@@ -20,7 +20,9 @@ object PassengerCounts {
   def updateForPort(config: AirportConfig, daysToLookBack: Int)
                    (implicit system: ActorSystem, ec: ExecutionContext, mat: Materializer, timeout: Timeout): Future[Done] = {
     val passengersActor = system.actorOf(Props(new PassengersActor(() => SDate.now(), 30)))
-    Source(config.terminals(SDate.now().toLocalDate).toList)
+    val startDate = SDate.now().toLocalDate
+    val endDate = SDate.now().addDays(180).toLocalDate
+    Source(config.terminalsForDateRange(startDate, endDate).toList)
       .flatMapConcat { terminal =>
         PaxDeltas.updateDailyPassengersByOriginAndDay(terminal.toString.toUpperCase, PaxDeltas.startDate(daysToLookBack), daysToLookBack - 1, passengersActor)
       }

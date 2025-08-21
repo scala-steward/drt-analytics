@@ -34,7 +34,7 @@ case class FlightRouteValuesTrainer(modelName: String,
                                     upperQuantile: Double,
                                     persistence: ModelPersistence,
                                     dumper: ModelPredictionsDump,
-                                    terminals: LocalDate => Iterable[Terminal],
+                                    terminals: (LocalDate, LocalDate) => Iterable[Terminal],
                                    )
                                    (implicit
                                     executionContext: ExecutionContext,
@@ -48,8 +48,11 @@ case class FlightRouteValuesTrainer(modelName: String,
     .config("spark.master", "local")
     .getOrCreate()
 
-  def trainTerminals(portCode: String): Future[Done] =
-    Source(terminals(SDate.now().toLocalDate).toList)
+  def trainTerminals(portCode: String): Future[Done] = {
+    val startDate = SDate.now().addDays(-daysOfTrainingData)
+    val endDate = SDate.now().toLocalDate
+
+    Source(terminals(startDate.toLocalDate, endDate).toList)
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
         train(daysOfTrainingData, 40, portCode, terminal).map(r => logStats(terminal, r))
@@ -59,6 +62,7 @@ case class FlightRouteValuesTrainer(modelName: String,
           }
       }
       .runWith(Sink.ignore)
+  }
 
   private def logStats(terminal: Terminal, result: Seq[Option[Double]]): Unit = {
     val total = result.size
