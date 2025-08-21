@@ -36,7 +36,7 @@ object AnalyticsApp {
   private val portCode = PortCode(config.getString("port-code").toUpperCase)
   private val jobTimeout = config.getInt("options.job-timeout-minutes").minutes
 
-  private val slackUrl = config.getString("slack.url")
+  private val slackUrl = config.getString("slack.webhook-url")
 
   private val tryWriteToS3: Try[(String, String) => Future[Done]] = for {
     accessKeyId <- Try(config.getString("aws.access-key-id"))
