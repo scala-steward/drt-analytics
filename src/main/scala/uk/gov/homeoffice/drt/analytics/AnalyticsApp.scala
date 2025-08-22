@@ -22,7 +22,7 @@ import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.language.postfixOps
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object AnalyticsApp {
   private val log: Logger = LoggerFactory.getLogger(getClass)
@@ -73,11 +73,19 @@ object AnalyticsApp {
 
         val slackClient =
           if (slackUrl.nonEmpty) {
-            val sendHttpRequest = (request: HttpRequest) => Http()(system).singleRequest(request)
-            val httpClient = ProdHttpClient(sendHttpRequest)
-            SlackClientImpl(httpClient, slackUrl)
+            Try {
+              val sendHttpRequest = (request: HttpRequest) => Http()(system).singleRequest(request)
+              val httpClient = ProdHttpClient(sendHttpRequest)
+              SlackClientImpl(httpClient, slackUrl)
+            } match {
+              case Success(client) => client
+              case Failure(ex) =>
+                log.error(s"Failed to initialize Slack client with webhook URL '$slackUrl': ${ex.getMessage}", ex)
+                NoopSlackClient
+            }
+          } else {
+            NoopSlackClient
           }
-          else NoopSlackClient
 
         val executor = JobExecutor(config, portCode, writePredictions, persistence, aggregatedDb, slackClient)
         val jobName = config.getString("options.job-name").toLowerCase
