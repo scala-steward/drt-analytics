@@ -10,6 +10,7 @@ import uk.gov.homeoffice.drt.actor.PredictionModelActor._
 import uk.gov.homeoffice.drt.actor.commands.Commands.GetState
 import uk.gov.homeoffice.drt.analytics.actors.Ack
 import uk.gov.homeoffice.drt.analytics.prediction.dump.NoOpDump
+import uk.gov.homeoffice.drt.notifications.NoopSlackClient
 import uk.gov.homeoffice.drt.ports.Terminals.{T2, Terminal}
 import uk.gov.homeoffice.drt.prediction.arrival.features.FeatureColumnsV1.{DayOfWeek, PartOfDay}
 import uk.gov.homeoffice.drt.prediction.category.FlightCategory
@@ -91,6 +92,7 @@ class FlightRouteValuesTrainerSpec
       persistence = MockPersistence(probe),
       dumper = NoOpDump,
       (_, _) => Seq(T2),
+      slackClient = NoopSlackClient,
     )
   }
 }
