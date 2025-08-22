@@ -1,14 +1,18 @@
 package uk.gov.homeoffice.drt.analytics
 
+import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.HttpRequest
 import org.apache.pekko.util.Timeout
-import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.{Logger, LoggerFactory}
+import uk.gov.homeoffice.drt.ProdHttpClient
 import uk.gov.homeoffice.drt.analytics.persistence.NoOpPersistence
 import uk.gov.homeoffice.drt.analytics.s3.Utils
 import uk.gov.homeoffice.drt.analytics.services.JobExecutor
 import uk.gov.homeoffice.drt.db.AggregatedDbTables
+import uk.gov.homeoffice.drt.notifications.{NoopSlackClient, SlackClientImpl}
 import uk.gov.homeoffice.drt.ports.PortCode
 import uk.gov.homeoffice.drt.ports.config.AirportConfigs
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
@@ -18,7 +22,7 @@ import uk.gov.homeoffice.drt.time.{SDate, SDateLike}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.language.postfixOps
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object AnalyticsApp {
   private val log: Logger = LoggerFactory.getLogger(getClass)
@@ -31,6 +35,8 @@ object AnalyticsApp {
 
   private val portCode = PortCode(config.getString("port-code").toUpperCase)
   private val jobTimeout = config.getInt("options.job-timeout-minutes").minutes
+
+  private val slackUrl = config.getString("slack.webhook-url")
 
   private val tryWriteToS3: Try[(String, String) => Future[Done]] = for {
     accessKeyId <- Try(config.getString("aws.access-key-id"))
@@ -65,7 +71,23 @@ object AnalyticsApp {
 
         val aggregatedDb: AggregatedDbTables = AggregatedDbTables(dataPersistenceType)
 
-        val executor = JobExecutor(config, portCode, writePredictions, persistence, aggregatedDb)
+        val slackClient =
+          if (slackUrl.nonEmpty) {
+            Try {
+              val sendHttpRequest = (request: HttpRequest) => Http()(system).singleRequest(request)
+              val httpClient = ProdHttpClient(sendHttpRequest)
+              SlackClientImpl(httpClient, slackUrl)
+            } match {
+              case Success(client) => client
+              case Failure(ex) =>
+                log.error(s"Failed to initialize Slack client with webhook URL '$slackUrl': ${ex.getMessage}", ex)
+                NoopSlackClient
+            }
+          } else {
+            NoopSlackClient
+          }
+
+        val executor = JobExecutor(config, portCode, writePredictions, persistence, aggregatedDb, slackClient)
         val jobName = config.getString("options.job-name").toLowerCase
         val eventualUpdates = executor.executeJob(portConfig, jobName)
 

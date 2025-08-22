@@ -14,6 +14,7 @@ import uk.gov.homeoffice.drt.analytics.services.ArrivalsHelper.{noopPreProcess, 
 import uk.gov.homeoffice.drt.arrivals.Arrival
 import uk.gov.homeoffice.drt.db.AggregatedDbTables
 import uk.gov.homeoffice.drt.db.dao.FlightDao
+import uk.gov.homeoffice.drt.notifications.SlackClient
 import uk.gov.homeoffice.drt.ports.Terminals.Terminal
 import uk.gov.homeoffice.drt.ports.{AirportConfig, PortCode}
 import uk.gov.homeoffice.drt.prediction.ModelPersistence
@@ -27,6 +28,7 @@ case class JobExecutor(config: Config,
                        predictionWriters: Iterable[(String, String) => Future[Done]],
                        persistence: ModelPersistence,
                        aggregatedDb: AggregatedDbTables,
+                       slackClient: SlackClient,
                       )
                       (implicit ec: ExecutionContext, timeout: Timeout, system: ActorSystem) {
   private val log: Logger = LoggerFactory.getLogger(getClass)
@@ -40,11 +42,11 @@ case class JobExecutor(config: Config,
         PassengerCounts.updateForPort(portConfig, daysToLookBack)
 
       case "update-off-schedule-models" =>
-        trainModels(OffScheduleModelDefinition, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, NoOpDump)
+        trainModels(OffScheduleModelDefinition, portCode.iata, portConfig.terminalsForDateRange, noopPreProcess, 0.1, 0.9, NoOpDump)
 
       case "update-to-chox-models" =>
         val baselineTimeToChox = portConfig.timeToChoxMillis / 60000
-        trainModels(ToChoxModelDefinition(baselineTimeToChox), portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, NoOpDump)
+        trainModels(ToChoxModelDefinition(baselineTimeToChox), portCode.iata, portConfig.terminalsForDateRange, noopPreProcess, 0.1, 0.9, NoOpDump)
 
       case "update-walk-time-models" =>
         val gatesPath = config.getString("options.gates-walk-time-file-path")
@@ -57,14 +59,14 @@ case class JobExecutor(config: Config,
 
         log.info(s"Loading walk times from ${maybeGatesFile.toList ++ maybeStandsFile.toList}")
         val modelDef = WalkTimeModelDefinition(maybeGatesFile, maybeStandsFile, portConfig.defaultWalkTimeMillis)
-        trainModels(modelDef, portCode.iata, portConfig.terminals, noopPreProcess, 0.1, 0.9, NoOpDump)
+        trainModels(modelDef, portCode.iata, portConfig.terminalsForDateRange, noopPreProcess, 0.1, 0.9, NoOpDump)
 
       case "update-pax-cap-models" =>
         val paxPredictionsDumper =
           if (predictionWriters.nonEmpty)
             PaxPredictionDump(ArrivalsProvider().arrivals, predictionWriters)
           else NoOpDump
-        trainModels(PaxCapModelDefinition, portCode.iata, portConfig.terminals, populateMaxPax(), 0d, 1d, paxPredictionsDumper)
+        trainModels(PaxCapModelDefinition, portCode.iata, portConfig.terminalsForDateRange, populateMaxPax(), 0d, 1d, paxPredictionsDumper)
 
       case unknown =>
         log.error(s"Unknown job name '$unknown'")
@@ -76,7 +78,7 @@ case class JobExecutor(config: Config,
 
   private def trainModels(modDef: ModelDefinition[Arrival, Terminal],
                           portCode: String,
-                          terminals: LocalDate => Iterable[Terminal],
+                          terminals: (LocalDate, LocalDate) => Iterable[Terminal],
                           preProcess: (UtcDate, Iterable[Arrival]) => Future[Iterable[Arrival]],
                           lowerQuantile: Double,
                           upperQuantile: Double,
@@ -105,6 +107,7 @@ case class JobExecutor(config: Config,
       persistence = persistence,
       dumper = dumpStats,
       terminals = terminals,
+      slackClient = slackClient,
     )
 
     trainer
