@@ -1,3 +1,4 @@
+import net.nmoncho.sbt.dependencycheck.settings.AnalyzerSettings
 
 ThisBuild / scalaVersion := "2.13.16"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
@@ -95,3 +96,16 @@ assembly / assemblyMergeStrategy := {
     log.debug(s"keeping last $default")
     MergeStrategy.last
 }
+
+ThisBuild / dependencyCheckAnalyzers := dependencyCheckAnalyzers.value.copy(
+  ossIndex = AnalyzerSettings.OssIndex(
+    enabled = Some(false),
+    url = None,
+    batchSize = None,
+    requestDelay = None,
+    useCache = None,
+    warnOnlyOnRemoteErrors = None,
+    username = None,
+    password = None
+  )
+)
