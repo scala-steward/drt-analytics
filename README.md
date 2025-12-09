@@ -5,6 +5,32 @@ This app produces ML models for arrivals:
  - How many minutes off its scheduled arrival time an arrival will be
  - How many minutes an arrival will take to get to chox from touchdown
  - The likely walk time passengers will have from the plane to the immigration hall
+ - The number of passengers on the flight
+
+## Running the app locally
+
+The app produces a model based on historical data. Therefore to produce a model locally you will need to download at
+least 3 or 4 months of historical data for the port in question. This data can be accessed via scripts in the
+infrastructure repo, and requires a connection to the ACP prod VPN.
+
+To run the app:
+
+```bash
+USE_PG_SSL=false \
+USE_PG_SSL_MODE=disable \
+DUMP_PREDICTIONS_FILE_PATH=<optional-local-path> \
+PORT_CODE=lgw \
+TRAINING_DAYS_OF_DATA=120 \
+JOB_NAME=update-pax-cap-models \
+SLACK_WEBHOOK_URL='' \
+NO_JSON_LOGGING= \
+sbt -J-Xmx15G run
+```
+
+Adjust `PORT_CODE` and `TRAINING_DAYS_OF_DATA` as required. You may also specify `DUMP_PREDICTIONS_FILE_PATH` to
+output model predictions to a local file for inspection.
+
+
 
 ## Accuracy
 
@@ -51,6 +77,6 @@ Terminal / Carrier :: day of week / am/pm / origin / flight number
 | Partition          | Features                                            | 10% | 20% | 30% | 40% | 50% | 60% | 70% | 80% | 90% | 100% |
 |--------------------|-----------------------------------------------------|-----|-----|-----|-----|-----|-----|-----|-----|-----|------|
 | Terminal / Carrier | day of week / am/pm / origin / flight number        | 91% | 91% | 91% | 91% | 91% | 88% | 73% | 58% | 38% | 14%  |
- | Terminal / Carrier | day of week / am/pm / origin                        | 91% | 91% | 91% | 91% | 91% | 82% | 70% | 52% | 38% | 14%  |
- | Terminal / Origin  | day of week + part of day + carrier + flight number | 83% | 83% | 81% | 81% | 81% | 80% | 70% | 51% | 26% | 9%   |
+| Terminal / Carrier | day of week / am/pm / origin                        | 91% | 91% | 91% | 91% | 91% | 82% | 70% | 52% | 38% | 14%  |
+| Terminal / Origin  | day of week + part of day + carrier + flight number | 83% | 83% | 81% | 81% | 81% | 80% | 70% | 51% | 26% | 9%   |
 
