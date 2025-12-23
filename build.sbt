@@ -1,4 +1,4 @@
-import net.nmoncho.sbt.dependencycheck.settings.AnalyzerSettings
+import net.nmoncho.sbt.dependencycheck.settings.{AnalyzerSettings, NvdApiSettings}
 
 ThisBuild / scalaVersion := "2.13.16"
 ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.getOrElse("BUILD_ID", "DEV"))
@@ -96,6 +96,10 @@ assembly / assemblyMergeStrategy := {
     log.debug(s"keeping last $default")
     MergeStrategy.last
 }
+
+val nvdAPIKey = sys.env.getOrElse("NVD_API_KEY", "")
+
+dependencyCheckNvdApi := NvdApiSettings(apiKey = nvdAPIKey)
 
 ThisBuild / dependencyCheckAnalyzers := dependencyCheckAnalyzers.value.copy(
   ossIndex = AnalyzerSettings.OssIndex(
