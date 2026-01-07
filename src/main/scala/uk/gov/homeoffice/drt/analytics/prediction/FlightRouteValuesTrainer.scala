@@ -58,14 +58,14 @@ case class FlightRouteValuesTrainer(modelName: String,
       .mapAsync(1) { terminal =>
         log.info(s"Training $modelName for $terminal")
         train(daysOfTrainingData, 40, portCode, terminal)
-          .map { r =>
-            slackClient.notify(s":tick: Trained $modelName for $portCode :: $terminal")
+          .flatMap { r =>
             logStats(terminal, r)
+            slackClient.notify(s":tick: Trained $modelName for $portCode :: $terminal")
           }
-          .recover {
+          .recoverWith {
             case t =>
-              slackClient.notify(s":x: Failed to train $modelName for $portCode :: $terminal: ${t.getMessage}")
               log.error(s"Failed to train $modelName for $terminal", t)
+              slackClient.notify(s":x: Failed to train $modelName for $portCode :: $terminal: ${t.getMessage}")
           }
       }
       .runWith(Sink.ignore)

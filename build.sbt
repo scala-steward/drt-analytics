@@ -5,12 +5,12 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v1268"
+lazy val drtLib = "v1382"
 
 
-lazy val pekkoVersion = "1.1.3"
-lazy val pekkoHttpVersion = "1.1.0"
-lazy val pekkoPersistenceJdbcVersion = "1.1.0"
+lazy val pekkoVersion = "1.1.5"
+lazy val pekkoHttpVersion = "1.2.0"
+lazy val pekkoPersistenceJdbcVersion = "1.1.1"
 
 lazy val postgresVersion = "42.7.5"
 lazy val jodaTimeVersion = "2.13.1"
