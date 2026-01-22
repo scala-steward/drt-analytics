@@ -3,9 +3,9 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.scala-lang.modules" % "scala-xml" % VersionScheme.Always
 )
 
-addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.11.1")
-addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.3.0")
-addSbtPlugin("com.sksamuel.scapegoat" %% "sbt-scapegoat" % "1.2.10")
+addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.11.7")
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.4.4")
+addSbtPlugin("org.johnnei.scapegoat" %% "sbt-scapegoat" % "1.3.7")
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.1")
-addSbtPlugin("net.nmoncho" % "sbt-dependency-check" % "1.7.1")
+addSbtPlugin("net.nmoncho" % "sbt-dependency-check" % "1.8.4")
 addDependencyTreePlugin

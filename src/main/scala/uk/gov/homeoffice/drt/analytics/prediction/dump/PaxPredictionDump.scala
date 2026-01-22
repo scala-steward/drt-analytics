@@ -155,7 +155,6 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
     Source(predictionsWithLabels)
       .mapAsync(1) {
         case (date, paxCountsForDate) =>
-          val actualCapOrig = paxCountsForDate.map(_._1).sum
           val flightCount = paxCountsForDate.length
 
           arrivalsForDate(terminal, date)
@@ -166,10 +165,6 @@ case class PaxPredictionDump(arrivalsForDate: (Terminal, LocalDate) => Future[Se
             }
             .map { arrivals =>
               val (actPax, predPax, fcstPax, actCapPct, predCapPct, fcstCapPct, predPaxDiffs, fcstPaxDiffs) = statsForArrivals(paxCountsForDate, arrivals)
-
-              if (Math.abs(actualCapOrig - actCapPct) > actualCapOrig * 0.1) {
-                log.warn(s"Actual cap changed by more than 10% from $actualCapOrig to $actCapPct for $date")
-              }
 
               (date, actPax, predPax, fcstPax, actCapPct / flightCount, predCapPct / flightCount, fcstCapPct / flightCount, flightCount, predPaxDiffs, fcstPaxDiffs)
             }

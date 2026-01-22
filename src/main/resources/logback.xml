@@ -38,6 +38,18 @@
         <appender-ref ref="ASYNC"/>
     </logger>
 
+    <logger level="ERROR" name="org.apache.spark.scheduler.TaskSetManager">
+        <appender-ref ref="ASYNC"/>
+    </logger>
+
+    <logger level="ERROR" name="dev.ludovic.netlib">
+        <appender-ref ref="ASYNC"/>
+    </logger>
+
+    <logger level="WARN" name="org.sparkproject.jetty.server.handler.ContextHandler">
+        <appender-ref ref="ASYNC"/>
+    </logger>
+
     <logger level="WARN" name="breeze.optimize">
         <appender-ref ref="ASYNC"/>
     </logger>

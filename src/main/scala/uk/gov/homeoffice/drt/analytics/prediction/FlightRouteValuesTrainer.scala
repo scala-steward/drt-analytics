@@ -75,12 +75,6 @@ case class FlightRouteValuesTrainer(modelName: String,
     val total = result.size
     val modelCount = result.count(_.isDefined)
     log.info(s"Terminal ${terminal.toString}: $total total, $modelCount models")
-
-    Seq(10, 20, 30, 40, 50, 60, 70, 80, 90, 100).foreach { threshold =>
-      val improvementsOverThreshold = result.collect { case Some(imp) if imp >= threshold => imp }.size
-      val pctOverThresholdTotal = (improvementsOverThreshold.toDouble / total.toDouble * 100).toInt
-      log.info(s"Terminal ${terminal.toString}: $pctOverThresholdTotal% >= $threshold% improvement")
-    }
   }
 
   private def train(daysOfData: Int,
@@ -150,7 +144,11 @@ case class FlightRouteValuesTrainer(modelName: String,
     val improvement = schMetrics.rootMeanSquaredError - predMetrics.rootMeanSquaredError
     val pctImprovement = (improvement / schMetrics.rootMeanSquaredError) * 100
 
-    log.info(s"RMSE = ${predMetrics.rootMeanSquaredError.round} Vs ${schMetrics.rootMeanSquaredError.round} -> ${improvement.round} improvement / ${pctImprovement.round}% improvement")
+    if (baselineValue > 0) {
+      log.info(s"${improvement.round} improvement / ${pctImprovement.round}% improvement")
+    }
+
+    log.info(s"RMSE = ${predMetrics.rootMeanSquaredError.round}, R2 = ${predMetrics.r2}")
 
     pctImprovement
   }
