@@ -45,7 +45,7 @@ Run the app to train pax forecast models using the downloaded data:
 USE_PG_SSL=false \
 USE_PG_SSL_MODE=disable \
 DUMP_PREDICTIONS_FILE_PATH=<optional-local-path> \
-PORT_CODE=lgw \
+PORT_CODE=lhr \
 TRAINING_DAYS_OF_DATA=120 \
 JOB_NAME=update-pax-cap-models \
 SLACK_WEBHOOK_URL='' \
