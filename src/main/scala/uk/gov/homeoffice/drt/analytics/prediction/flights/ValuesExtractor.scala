@@ -34,7 +34,7 @@ case class ValuesExtractor(extraction: (UtcDate, Terminal) => Future[Map[WithId,
   private def extractValuesForDate(terminal: Terminal, date: UtcDate)
                                   (implicit ec: ExecutionContext): Future[Map[WithId, Iterable[(Double, Seq[String], Seq[Double], String)]]] = {
     extraction(date, terminal).map { featuresAndValuesForDate =>
-      log.info(s"Extracted ${featuresAndValuesForDate.size} features for $terminal on $date")
+      log.debug(s"Extracted ${featuresAndValuesForDate.size} features for $terminal on $date")
       featuresAndValuesForDate
     }
   }

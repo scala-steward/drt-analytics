@@ -1,17 +1,12 @@
 package uk.gov.homeoffice.drt.analytics.prediction
 
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, LinearRegressionSummary}
-import org.apache.spark.sql.functions.{col, concat_ws, monotonically_increasing_id, rand}
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.slf4j.LoggerFactory
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import uk.gov.homeoffice.drt.prediction.FeaturesWithOneToManyValues
 import uk.gov.homeoffice.drt.prediction.arrival.features.{Feature, OneToManyFeature, SingleFeature}
 
-import scala.util.Try
-
 case class DataSet(df: DataFrame, features: List[Feature[_]]) {
-  private val log = LoggerFactory.getLogger(getClass)
-
   val dfIndexed: DataFrame = df.withColumn("_index", monotonically_increasing_id())
 
   val numRows: Long = dfIndexed.count()
@@ -29,6 +24,7 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
   def trainModel(labelCol: String, trainingSplitPercentage: Int)
                 (implicit session: SparkSession): LinearRegressionModel =
     new LinearRegression()
+      .setRegParam(0.1)
       .fit(prepareDataFrame(labelCol, trainingSplitPercentage, sortAscending = true))
 
   def evaluate(labelCol: String, trainingSplitPercentage: Int, model: LinearRegressionModel)
@@ -43,31 +39,27 @@ case class DataSet(df: DataFrame, features: List[Feature[_]]) {
 
   private def prepareDataFrame(labelColName: String, takePercentage: Int, sortAscending: Boolean)
                               (implicit session: SparkSession): DataFrame = {
-    import session.implicits._
+
+    // Broadcast the feature metadata
+    val featuresBc = session.sparkContext.broadcast(featuresWithOneToManyValues)
+
+    val createFeaturesVector = udf { (row: Row) =>
+      FeatureVectors.featuresVectorForRow(row, featuresBc.value)
+    }
 
     val labelAndFeatures = FeatureVectors.labelAndFeatureCols(df.columns, labelColName)
-
     val partitionIndexValue = (numRows * (takePercentage.toDouble / 100)).toInt
 
     dfIndexed
       .select(labelAndFeatures: _*)
       .limit(partitionIndexValue)
-      .collect.toSeq
-      .map { row =>
-        val label = row.getAs[Double](0)
-        val index = row.getAs[String]("index")
-        Try(FeatureVectors.featuresVectorForRow(row, featuresWithOneToManyValues)) match {
-          case scala.util.Success(featuresVector) =>
-            Option((label, featuresVector, index))
-          case scala.util.Failure(t) =>
-            log.error(s"Failed to create features vector for row $row. Features: $featuresWithOneToManyValues", t)
-            None
-        }
-      }
-      .collect {
-        case Some((label, featuresVector, index)) => (label, featuresVector, index)
-      }
-      .toDF("label", "features", "index")
+      .withColumn("features", createFeaturesVector(struct(col("*"))))
+      .select(
+        col(labelColName).as("label"),
+        col("features"),
+        col("index")
+      )
+      .na.drop()  // filter out nulls from failed vector creation
   }
 
   def shuffle(): DataSet = copy(df = dfIndexed.sort(rand))
