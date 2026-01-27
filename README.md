@@ -13,7 +13,33 @@ The app produces a model based on historical data. Therefore to produce a model 
 least 3 or 4 months of historical data for the port in question. This data can be accessed via scripts in the
 infrastructure repo, and requires a connection to the ACP prod VPN.
 
-To run the app:
+To download flight data for eg London Heathrow (LHR) for the last 120 days, exec into the aggregated db via kubectl using the kube-drt repo bin scripts:
+
+```bash
+./bin/rds-aggregated.sh -n drt-preprod
+```
+
+Run the following psql command to dump the flight data to a local file:
+
+```\COPY (SELECT * from flight where port='LHR' and scheduled_date_utc between '2025-07-01' and '2026-01-26') TO '/tmp/lhr-flights.sql';```
+
+Copy the file to your local machine using kube-ctl cp:
+
+```
+kubectl -n=drt-preprod cp rds-proxies-7466bccc44-zf2gr:/tmp/lhr-flights.sql lhr-flights.sql
+```
+
+Finally import the data to your local aggregated db:
+
+```
+PGPASSWORD=drt psql -U drt -h localhost aggregated
+
+\COPY flight FROM 'lhr-flights.sql';
+```
+
+
+
+Run the app to train pax forecast models using the downloaded data:
 
 ```bash
 USE_PG_SSL=false \
