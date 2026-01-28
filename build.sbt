@@ -47,9 +47,9 @@ libraryDependencies ++= Seq(
   "org.typelevel" %% "cats-core" % catsVersion,
   "software.amazon.awssdk" % "s3" % awsJava2SdkVersion,
   "com.typesafe" %% "ssl-config-core" % sslConfigCoreVersion,
-  "dev.ludovic.netlib" % "blas" % "3.0.3",
-  "dev.ludovic.netlib" % "lapack" % "3.0.3",
-  "dev.ludovic.netlib" % "arpack" % "3.0.3",
+  "dev.ludovic.netlib" % "blas" % "3.0.5",
+  "dev.ludovic.netlib" % "lapack" % "3.0.5",
+  "dev.ludovic.netlib" % "arpack" % "3.0.5",
 
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
   "org.specs2" %% "specs2-core" % specs2Version % Test,
