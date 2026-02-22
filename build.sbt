@@ -21,7 +21,7 @@ lazy val catsVersion = "2.13.0"
 lazy val awsJava2SdkVersion = "2.30.38"
 lazy val sslConfigCoreVersion = "0.7.1"
 lazy val scalaXmlVersion = "2.4.0"
-lazy val logbackClassicVersion = "1.5.24"
+lazy val logbackClassicVersion = "1.5.32"
 lazy val logbackJsonClassicVersion = "0.1.5"
 lazy val logbackJacksonVersion = "0.1.5"
 
