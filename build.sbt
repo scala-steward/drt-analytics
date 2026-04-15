@@ -5,7 +5,7 @@ ThisBuild / version := "v" + sys.env.getOrElse("DRONE_BUILD_NUMBER", sys.env.get
 ThisBuild / organization := "uk.gov.homeoffice"
 ThisBuild / organizationName := "drt"
 
-lazy val drtLib = "v1394"
+lazy val drtLib = "v1397"
 
 
 lazy val pekkoVersion = "1.4.0"
@@ -76,6 +76,7 @@ lazy val root = (project in file("."))
   )
   .enablePlugins(DockerPlugin)
   .enablePlugins(JavaAppPackaging)
+  .settings(SbtUpdatesSettings.sbtUpdatesSettings *)
 
 assembly / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") =>
