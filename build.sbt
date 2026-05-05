@@ -13,7 +13,7 @@ lazy val pekkoHttpVersion = "1.3.0"
 lazy val pekkoPersistenceJdbcVersion = "1.2.0"
 
 lazy val postgresVersion = "42.7.8"
-lazy val jodaTimeVersion = "2.14.0"
+lazy val jodaTimeVersion = "2.14.2"
 lazy val specs2Version = "4.23.0"
 lazy val sparkVersion = "4.1.1"
 lazy val scalaTestVersion = "3.2.19"
