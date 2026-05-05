@@ -8,7 +8,7 @@ ThisBuild / organizationName := "drt"
 lazy val drtLib = "v1397"
 
 
-lazy val pekkoVersion = "1.4.0"
+lazy val pekkoVersion = "1.6.0"
 lazy val pekkoHttpVersion = "1.3.0"
 lazy val pekkoPersistenceJdbcVersion = "1.2.0"
 
